@@ -4,7 +4,8 @@ export const levels4 = [
     name: 'Hello, World',
     mode: 'flip',
     blurb: ['Tap to flip gravity', 'Code blocks grow from both sides', 'Halfway checkpoint'],
-    speedMul: 0.92,
+    speedMul: 0.94,
+    ramp: 0.12,
     powerups: [
       { chunk: 1, at: 1170, lift: 22, kind: 'shield' },
       { chunk: 3, at: 1170, lift: 22, kind: 'blaster' },
@@ -34,7 +35,8 @@ export const levels4 = [
     name: 'Merge Conflict',
     mode: 'flip',
     blurb: ['Floating blocks and cursors', 'Longer zigzags', 'Hazard strips'],
-    speedMul: 1.0,
+    speedMul: 1.06,
+    ramp: 0.2,
     powerups: [
       { chunk: 5, at: 1200, lift: 22, kind: 'shield' },
       { chunk: 2, at: 1700, lift: 22, kind: 'blaster' },
@@ -51,20 +53,21 @@ export const levels4 = [
       'mixA',
       'errCeil',
       'zigzag',
-      'cursorOne',
+      'cursorPair',
       'mixB',
       'floatBlock',
       'cursorBlocks',
-      'mixA',
-      'zigzag'
+      'errMix',
+      'tightZig'
     ]
   },
   {
     id: 'w4l3',
     name: 'Production Hotfix',
     mode: 'flip',
-    blurb: ['Tested at speed', 'Tighter flips', 'No new obstacles'],
-    speedMul: 1.1,
+    blurb: ['Fast and tight', 'Cursor pairs and mixed hazards', 'Power-ups decide the gauntlets'],
+    speedMul: 1.2,
+    ramp: 0.28,
     powerups: [
       { chunk: 1, at: 1700, lift: 22, kind: 'slowmo' },
       { chunk: 2, at: 1700, lift: 22, kind: 'shield' },
@@ -75,16 +78,16 @@ export const levels4 = [
       'runway',
       'fast',
       'cursorBlocks',
-      'mixA',
+      'errMix',
       'gauntlet',
       'errFloor',
       'fast',
       'adMixB',
       'zigzag',
-      'gauntlet',
+      'cursorPair',
       'errCeil',
-      'fast',
-      'mixA',
+      'tightZig',
+      'errMix',
       'gauntlet'
     ]
   }

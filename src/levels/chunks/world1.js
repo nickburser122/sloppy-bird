@@ -3,7 +3,8 @@ import { tuning } from '../../config/tuning.js';
 const ARC = {
   button: { n: 3, gap: 26, base: 40, peak: 22 },
   modal: { n: 3, gap: 28, base: 112, peak: 30 },
-  errorbar: { n: 5, gap: 38, base: 44, peak: 26 }
+  errorbar: { n: 5, gap: 38, base: 44, peak: 26 },
+  float: { n: 3, gap: 34, base: 22, peak: 0 }
 };
 
 function arc(center, spec) {
@@ -31,6 +32,7 @@ const m = (at) => ({ type: 'modal', at });
 const e = (at) => ({ type: 'errorbar', at });
 const bd = (at) => ({ type: 'button', at, destructible: true });
 const md = (at) => ({ type: 'modal', at, destructible: true });
+const hd = (at) => ({ type: 'float', at, lift: 60 });
 
 export const chunks = {
   runway: make(900, [], [
@@ -60,5 +62,17 @@ export const chunks = {
   adButton: make(1200, [bd(700)]),
   adPair: make(1500, [bd(600), bd(1000)]),
   adModal: make(1300, [md(700)]),
-  adFastPair: make(1500, [bd(500), bd(850)])
+  adFastPair: make(1500, [bd(500), bd(850)]),
+  headerOne: make(1400, [hd(700)]),
+  hopHeader: make(1800, [b(500), hd(1000)]),
+  headerHop: make(1800, [hd(500), b(1050)]),
+  headerModal: make(1900, [hd(500), m(1100)]),
+  headerError: make(1800, [hd(500), e(1000)]),
+  sandwich: make(2300, [b(500), hd(1000), b(1550)]),
+  lowRoad: make(2600, [hd(500), hd(850), b(1350)]),
+  fastHeader: make(2000, [b(500), hd(900), b(1300)]),
+  adHeader: make(1900, [bd(500), hd(1000)]),
+  headerGauntlet: make(3000, [b(500), hd(900), m(1500), hd(1950), e(2450)]),
+  errorRun: make(2400, [e(500), e(1000), e(1500)]),
+  tightTriple: make(1900, [b(500), b(800), b(1100)])
 };

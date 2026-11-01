@@ -98,7 +98,7 @@ export function appendSurfPattern(terrain, pattern, origin, prevEnd, orbGap) {
   if (rest > 800) terrain.addPoint(prevEnd + rest / 2, 110);
   for (const pt of pattern.terrain) terrain.addPoint(origin + pt[0], pt[1]);
   for (const o of pattern.obstacles) {
-    if (o.type === 'nodata') terrain.addGap(origin + o.at, origin + o.at + tuning.nodata.w);
+    if (o.type === 'nodata') terrain.addGap(origin + o.at, origin + o.at + (o.w || tuning.nodata.w));
   }
   const end = origin + pattern.length;
   const orbX = end + orbGap;

@@ -377,7 +377,7 @@ function surfReach(level) {
     const d0 = Math.max(0, first.x - t.size - (level.speedAt(first.x) * v.surfLeadMs) / 1000);
     const dEnd = cl.end + t.size + 40;
     let layer = [];
-    for (const b of [0, t.boostMax * 0.5]) {
+    for (const b of [0]) {
       mode.d = d0;
       mode.dx = 0;
       mode.reset();

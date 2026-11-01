@@ -545,8 +545,24 @@ export function drawObstacle(ctx, o, x, gy, time, d) {
   else drawButton(ctx, o, x, gy);
 }
 
-export function drawToken(ctx, x, y, r) {
+export function drawToken(ctx, x, y, r, bonus) {
   const s = r * 1.7;
+  if (bonus) {
+    ctx.save();
+    ctx.fillStyle = colors.accent;
+    ctx.strokeStyle = colors.surface;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - s * 0.62);
+    ctx.lineTo(x + s * 0.62, y);
+    ctx.lineTo(x, y + s * 0.62);
+    ctx.lineTo(x - s * 0.62, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   ctx.fillStyle = colors.surface;
   ctx.strokeStyle = colors.accent;
   ctx.lineWidth = 1.5;
@@ -573,6 +589,12 @@ export function drawOrb(ctx, x, y, r, time) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+  ctx.fillStyle = colors.fg;
+  ctx.font = '700 11px ' + tokens.font.mono;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('BUG', x, y - r - 8);
+  ctx.textAlign = 'start';
   ctx.fillStyle = colors.accent;
   ctx.beginPath();
   ctx.ellipse(x, y + 1, r * 0.34, r * 0.44, 0, 0, Math.PI * 2);

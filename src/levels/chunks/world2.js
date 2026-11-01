@@ -71,6 +71,19 @@ export const chunks = {
     { bubble: [1800, 140] },
     { gate: [2200, 220, 190] }
   ]),
+  tightGates: build(2200, [
+    { gate: [500, 170, 170] },
+    { gate: [880, 250, 170] },
+    { gate: [1260, 110, 170] },
+    { gate: [1640, 240, 170] }
+  ]),
+  likeChain: build(2400, [
+    { like: [500, 200, 0] },
+    { like: [900, 160, 300] },
+    { like: [1300, 200, 100] },
+    { like: [1700, 150, 0] }
+  ]),
+  slalom: build(2400, [{ bubble: [500, 230] }, { bubble: [850, 110] }, { bubble: [1200, 230] }, { bubble: [1550, 110] }]),
   adBubble: build(1500, [{ bubble: [500, 230], d: true }, { bubble: [900, 110] }]),
   adLike: build(1600, [{ like: [500, 200, 0], d: true }, { like: [950, 160, 300], d: true }]),
   adFast: build(2200, [

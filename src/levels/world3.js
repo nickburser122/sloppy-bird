@@ -5,6 +5,7 @@ export const levels3 = [
     mode: 'surf',
     blurb: ['Hold to dive, release to fly', 'Release at the crest for a boost', 'Halfway checkpoint'],
     speedMul: 0.95,
+    ramp: 0.12,
     powerups: [
       { chunk: 1, at: 600, lift: 'ride', kind: 'shield' },
       { chunk: 3, at: 700, lift: 'ride', kind: 'blaster' },
@@ -34,7 +35,8 @@ export const levels3 = [
     name: 'Live Metrics',
     mode: 'surf',
     blurb: ['Floating KPI cards', 'Moving tickers', 'Longer gaps'],
-    speedMul: 1.0,
+    speedMul: 1.05,
+    ramp: 0.18,
     powerups: [
       { chunk: 0, at: 700, lift: 'ride', kind: 'shield' },
       { chunk: 3, at: 600, lift: 'ride', kind: 'blaster' },
@@ -47,15 +49,15 @@ export const levels3 = [
       'gapKpi',
       'bubbleValley',
       'adKpiPair',
-      'gapTwo',
+      'gapChain',
       'tickerKpi',
       'rollingTall',
       'gapBubble',
       'tickerOne',
       'combo',
       'kpiPair',
-      'gapKpi',
-      'tickerKpi',
+      'tickerPair',
+      'gapWide',
       'gapBubble'
     ]
   },
@@ -63,8 +65,9 @@ export const levels3 = [
     id: 'w3l3',
     name: 'Real-Time Everything',
     mode: 'surf',
-    blurb: ['Tested at speed', 'Tighter combos', 'No new obstacles'],
-    speedMul: 1.1,
+    blurb: ['Fast and wide', 'Pit chains and ticker pairs', 'Power-ups decide the gauntlets'],
+    speedMul: 1.2,
+    ramp: 0.24,
     powerups: [
       { chunk: 0, at: 700, lift: 'ride', kind: 'shield' },
       { chunk: 2, at: 120, lift: 'ride', kind: 'slowmo' },
@@ -73,18 +76,18 @@ export const levels3 = [
     ],
     chunks: [
       'rolling',
-      'gapKpi',
-      'tickerKpi',
+      'gapWide',
+      'tickerPair',
       'combo',
       'gapTwo',
       'adKpiPair',
       'gapBubble',
       'finale',
-      'tickerKpi',
-      'combo',
       'gapKpi',
+      'combo',
+      'gapChain',
       'finale',
-      'tickerKpi',
+      'gapChain',
       'gapBubble'
     ]
   }

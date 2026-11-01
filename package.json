@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vitest run && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "playtest": "vitest run --config playtest/vitest.config.js"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

@@ -26,6 +26,10 @@ export function compileLevel(def, library) {
     x += chunk.length;
   }
   obstacles.sort((a, b) => a.x - b.x);
+  for (const ob of obstacles) {
+    if (ob.kind !== 'solid' || ob.bobAmp) continue;
+    items.push({ x: ob.x + ob.w / 2, lift: ob.lift + ob.h / 2, kind: 'token', bonus: true, got: false });
+  }
   const length = x;
   if (terrain) {
     terrain.seal();
@@ -51,12 +55,13 @@ export function compileLevel(def, library) {
     }
   }
   const mul = def.speedMul || 1;
+  const ramp = def.ramp !== undefined ? def.ramp : tuning.world.speedRamp;
   const speedAt = (d) =>
     tuning.world.speed *
     mul *
     tuning.debug.speedScale *
-    (1 + tuning.world.speedRamp * Math.min(1, Math.max(0, d) / length));
-  return { id: def.id, name: def.name, mode, terrain, length, checkpoint, obstacles, items, tokenTotal: items.filter((i) => i.kind === 'token').length, speedAt };
+    (1 + ramp * Math.min(1, Math.max(0, d) / length));
+  return { id: def.id, name: def.name, mode, terrain, length, checkpoint, obstacles, items, tokenTotal: items.filter((i) => i.kind === 'token' && !i.bonus).length, speedAt };
 }
 
 function surfTokens(terrain, obstacles, length) {

@@ -265,8 +265,8 @@ export class LevelScene extends Scene {
       else if (it.kind === 'power') drawPower(ctx, sx, iy, it.power, rt.time);
       else if (it.pull > 0) {
         const k = it.pull * it.pull;
-        drawToken(ctx, sx + (p.x + p.size / 2 - sx) * k, iy + (p.y + p.size / 2 - iy) * k, tuning.token.r);
-      } else drawToken(ctx, sx, iy, tuning.token.r);
+        drawToken(ctx, sx + (p.x + p.size / 2 - sx) * k, iy + (p.y + p.size / 2 - iy) * k, tuning.token.r, it.bonus);
+      } else drawToken(ctx, sx, iy, tuning.token.r, it.bonus);
     }
   }
 

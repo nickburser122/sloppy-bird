@@ -152,9 +152,18 @@ describe('shield in the runtime', () => {
     expect(rt.deaths).toBe(1);
   });
 
-  it('does not protect against hazard zones', () => {
+  it('also absorbs one hazard hit', () => {
     const { rt } = make([{ type: 'errorbar', at: 600 }]);
     rt.power.activate('shield');
+    let breaks = 0;
+    rt.onShieldBreak = () => breaks++;
+    runUntil(rt, () => breaks > 0);
+    expect(breaks).toBe(1);
+    expect(rt.state).toBe('running');
+  });
+
+  it('a hazard without a shield still kills', () => {
+    const { rt } = make([{ type: 'errorbar', at: 600 }]);
     runUntil(rt, () => rt.state === 'dead');
     expect(rt.state).toBe('dead');
   });
@@ -190,8 +199,18 @@ describe('blaster in the runtime', () => {
     expect(rt.state).toBe('running');
   });
 
-  it('does not harm solid obstacles that are not dashed', () => {
+  it('also breaks plain solid obstacles', () => {
     const { rt } = make([{ type: 'button', at: 1200 }]);
+    rt.power.activate('blaster');
+    let destroyed = 0;
+    rt.onDestroy = () => destroyed++;
+    run(rt, 360);
+    expect(destroyed).toBe(1);
+    expect(rt.state).toBe('running');
+  });
+
+  it('does not break hazards', () => {
+    const { rt } = make([{ type: 'errorbar', at: 1200 }]);
     rt.power.activate('blaster');
     let destroyed = 0;
     rt.onDestroy = () => destroyed++;

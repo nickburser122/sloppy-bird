@@ -4,7 +4,8 @@ export const levels2 = [
     name: 'Infinite Scroll',
     mode: 'flap',
     blurb: ['Tap to flap, hold to glide', 'Feed cards and bubbles', 'Halfway checkpoint'],
-    speedMul: 0.9,
+    speedMul: 0.92,
+    ramp: 0.12,
     powerups: [
       { chunk: 1, at: 250, lift: 190, kind: 'shield' },
       { chunk: 2, at: 1200, lift: 180, kind: 'blaster' },
@@ -34,7 +35,8 @@ export const levels2 = [
     name: 'Notification Storm',
     mode: 'flap',
     blurb: ['Everything at once', 'Moving likes', 'Floor hazards'],
-    speedMul: 0.98,
+    speedMul: 1.04,
+    ramp: 0.2,
     powerups: [
       { chunk: 1, at: 250, lift: 120, kind: 'shield' },
       { chunk: 2, at: 250, lift: 180, kind: 'blaster' },
@@ -49,13 +51,13 @@ export const levels2 = [
       'floorGate',
       'mixA',
       'likeGate',
-      'bubblePair',
+      'slalom',
       'floorBubble',
       'gatesWide',
-      'mixB',
+      'tightGates',
       'likeGate',
       'gatesZig',
-      'bubbleGate',
+      'likeChain',
       'mixA'
     ]
   },
@@ -63,8 +65,9 @@ export const levels2 = [
     id: 'w2l3',
     name: 'Engagement Spike',
     mode: 'flap',
-    blurb: ['Tested at speed', 'Tighter gaps', 'No new obstacles'],
-    speedMul: 1.08,
+    blurb: ['Fast and tight', 'Chained likes and slaloms', 'Power-ups decide the gauntlets'],
+    speedMul: 1.16,
+    ramp: 0.28,
     powerups: [
       { chunk: 1, at: 250, lift: 180, kind: 'slowmo' },
       { chunk: 3, at: 250, lift: 200, kind: 'shield' },
@@ -74,17 +77,17 @@ export const levels2 = [
     chunks: [
       'runway',
       'fastGates',
-      'likePair',
+      'likeChain',
       'mixA',
       'gauntlet',
       'floorGate',
       'adFast',
-      'mixB',
+      'tightGates',
       'likeGate',
       'gauntlet',
-      'bubblePair',
+      'slalom',
       'fastGates',
-      'mixA',
+      'tightGates',
       'gauntlet'
     ]
   }

@@ -220,10 +220,11 @@ describe('SURF validator', () => {
     expect(validateReachability(level(surf(1500, [150, 150], [{ kpi: [1, 215] }]))).ok).toBe(true);
   });
 
-  it('rejects when toggling faster than a human can is the only way through', () => {
+  it('a pit can be crossed with almost no input, so no frame-perfect timing is needed', () => {
     tuning.validator.surfMinToggleMs = 2000;
     try {
-      expect(validateReachability(level(chunks.gapKpi)).ok).toBe(false);
+      expect(validateReachability(level(chunks.gapKpi)).ok).toBe(true);
+      expect(validateReachability(level(chunks.gapTwo)).ok).toBe(true);
     } finally {
       Object.assign(tuning.validator, defaults.validator);
     }

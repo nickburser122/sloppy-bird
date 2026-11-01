@@ -185,7 +185,7 @@ export class LevelRuntime {
     const pool = this.pool;
     for (let i = 0; i < pool.count; i++) {
       const o = pool.active[i];
-      if (!o.destructible || o.destroyed) continue;
+      if (o.kind !== 'solid' || o.destroyed) continue;
       const h = o.hit;
       if (b.x + tuning.blaster.w > h.x && b.x < h.x + h.w && b.y + tuning.blaster.h > h.y && b.y < h.y + h.h) {
         o.destroyed = true;
@@ -242,8 +242,8 @@ export class LevelRuntime {
     this.pool.update(this.visit);
     this.updateBlaster(dt);
     if (this.hitFlag && !tuning.debug.invincible) {
-      let dies = this.hitHazard;
-      if (!dies && this.hitSolid && this.iframes <= 0) {
+      let dies = false;
+      if (this.iframes <= 0) {
         if (this.power.breakShield()) {
           this.iframes = tuning.shield.iframeMs;
           if (this.onShieldBreak) this.onShieldBreak();

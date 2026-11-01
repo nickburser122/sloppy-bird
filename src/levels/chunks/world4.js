@@ -74,6 +74,14 @@ export const chunks = {
     { block: [1900, 120, 'c'] },
     { block: [2300, 130, 'f'] }
   ]),
+  tightZig: flip(2200, [
+    { block: [500, 120, 'f'] },
+    { block: [840, 120, 'c'] },
+    { block: [1180, 120, 'f'] },
+    { block: [1520, 120, 'c'] }
+  ]),
+  cursorPair: flip(2400, [{ cursor: [500] }, { cursor: [1000] }, { block: [1500, 130, 'f'] }]),
+  errMix: flip(2600, [{ err: [500, 'f'] }, { block: [900, 120, 'c'] }, { err: [1300, 'c'] }, { block: [1700, 120, 'f'] }]),
   adBlocksTall: flip(2000, [
     { block: [500, 150, 'f'], d: true },
     { block: [1050, 150, 'c'], d: true },

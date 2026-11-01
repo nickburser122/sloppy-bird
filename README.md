@@ -34,6 +34,18 @@ A one-button auto-runner anthology. You are a glowing cursor running through web
 - The validator simulates each controller and proves every level, boss phase and checkpoint is beatable without power-ups.
 - Tests cover physics, validators, save data and migration, settings, assist mode, accessibility contrast, drawing in every theme, the production bundle and the offline service worker, plus seeded fuzzing.
 
+## Playtest
+
+`npm run playtest` plays every level and every boss with a bot that has no invincibility. It reads the live game state, looks ahead with the real movement code and fails if a level or boss cannot actually be cleared in play. The validator only proves a path exists on paper; the playtest proves the shipped scenes can be won.
+
+## Power-ups
+
+- Blaster breaks any solid obstacle in its line of fire. Hazards are untouched.
+- Shield absorbs one hit from a solid or a hazard, then grants a short grace period.
+- Magnet pulls in every token within range, including diamond bonus tokens buried inside obstacles.
+- Slow-mo drops the world to 60% speed.
+- Bonus tokens count toward the star ratio but not toward the total, so they can lift a run over the 80% line.
+
 ## Settings and saves
 
 Settings and progress live in `localStorage` under one versioned key. Assist mode runs at 80% speed and starts each attempt with a shield.

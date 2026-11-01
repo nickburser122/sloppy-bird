@@ -58,7 +58,7 @@ describe('power-up placement', () => {
     });
 
     it(def.id + ' keeps token counts honest: pickups are not counted', () => {
-      expect(level.tokenTotal).toBe(level.items.filter((i) => i.kind === 'token').length);
+      expect(level.tokenTotal).toBe(level.items.filter((i) => i.kind === 'token' && !i.bonus).length);
     });
   }
 
