@@ -17,12 +17,11 @@ function arc(center, spec) {
   return out;
 }
 
-function make(length, obstacles, extra) {
-  const items = extra ? extra.slice() : [];
+function make(length, obstacles) {
+  const items = [];
   for (const o of obstacles) {
     const w = tuning[o.type].w;
     for (const t of arc(o.at + w / 2, ARC[o.type])) items.push(t);
-    items.push({ at: o.at - 300, lift: 24 }, { at: o.at - 360, lift: 24 });
   }
   return { length, obstacles, items };
 }
@@ -30,49 +29,32 @@ function make(length, obstacles, extra) {
 const b = (at) => ({ type: 'button', at });
 const m = (at) => ({ type: 'modal', at });
 const e = (at) => ({ type: 'errorbar', at });
-const bd = (at) => ({ type: 'button', at, destructible: true });
-const md = (at) => ({ type: 'modal', at, destructible: true });
 const hd = (at) => ({ type: 'float', at, lift: 60 });
 
 export const chunks = {
-  runway: make(900, [], [
-    { at: 400, lift: 24 },
-    { at: 460, lift: 24 },
-    { at: 520, lift: 24 }
+  aboveTheFold: make(17350, [
+    m(1100), e(1515), m(1981), e(2298), b(2676), e(2890),
+    b(3200), e(3521), b(3813), b(3970), b(4126), e(4452),
+    m(4770), b(5127), m(5286), e(5485), m(5954), m(6231),
+    m(6567), e(6785), e(7083), b(7381), e(7544), b(7843),
+    m(8007), b(8379), e(8543), b(8845), b(9010), m(9208),
+    b(9402), b(9569), b(9736), b(10087), e(10255), m(10632),
+    e(10840), m(11334), m(11616), e(12005), m(12336), b(12536),
+    b(12708), b(12881), e(13054), e(13364), e(13674), m(14088),
+    e(14320), m(14655), b(14860), m(15132), e(15365), e(15678),
+    e(15993), m(16447), e(16670)
   ]),
-  soloButton: make(1200, [b(700)]),
-  doubleButton: make(1500, [b(600), b(1000)]),
-  tripleButton: make(1700, [b(500), b(900), b(1300)]),
-  soloModal: make(1300, [m(700)]),
-  soloError: make(1400, [e(700)]),
-  buttonModal: make(1700, [b(600), m(1100)]),
-  modalError: make(1700, [m(500), e(1000)]),
-  buttonError: make(1600, [b(500), e(950)]),
-  modalModal: make(1700, [m(500), m(1050)]),
-  errorModal: make(1700, [e(500), m(1100)]),
-  mixedA: make(2200, [b(500), e(950), m(1600)]),
-  mixedB: make(2200, [m(500), b(1100), e(1550)]),
-  finale: make(2000, [b(500), b(900), m(1400)]),
-  fastPair: make(1500, [b(500), b(850)]),
-  fastTriple: make(1800, [b(500), b(820), b(1140)]),
-  errorButton: make(1700, [e(500), b(1000)]),
-  modalHop: make(1700, [m(500), b(950)]),
-  stagger: make(2200, [b(500), m(1000), b(1500)]),
-  gauntlet: make(2500, [b(500), e(900), b(1450), m(1850)]),
-  adButton: make(1200, [bd(700)]),
-  adPair: make(1500, [bd(600), bd(1000)]),
-  adModal: make(1300, [md(700)]),
-  adFastPair: make(1500, [bd(500), bd(850)]),
-  headerOne: make(1400, [hd(700)]),
-  hopHeader: make(1800, [b(500), hd(1000)]),
-  headerHop: make(1800, [hd(500), b(1050)]),
-  headerModal: make(1900, [hd(500), m(1100)]),
-  headerError: make(1800, [hd(500), e(1000)]),
-  sandwich: make(2300, [b(500), hd(1000), b(1550)]),
-  lowRoad: make(2600, [hd(500), hd(850), b(1350)]),
-  fastHeader: make(2000, [b(500), hd(900), b(1300)]),
-  adHeader: make(1900, [bd(500), hd(1000)]),
-  headerGauntlet: make(3000, [b(500), hd(900), m(1500), hd(1950), e(2450)]),
-  errorRun: make(2400, [e(500), e(1000), e(1500)]),
-  tightTriple: make(1900, [b(500), b(800), b(1100)])
+  stickyHeader: make(18700, [
+    e(1100), e(1650), e(2139), e(2749), e(3113), e(3436),
+    hd(3736), hd(3966), b(4197), m(4362), m(4640), b(4834),
+    e(5000), hd(5303), hd(5536), e(5770), b(6074), hd(6243),
+    b(6478), m(6647), e(6857), b(7163), hd(7334), b(7762),
+    hd(7933), e(8171), e(8480), b(8789), b(8963), e(9137),
+    m(9471), m(9870), hd(10074), hd(10316), e(10559), hd(10872),
+    b(11115), e(11293), m(11639), hd(11862), e(12107), hd(12423),
+    m(12694), e(13107), hd(13425), m(13697), b(13908), e(14091),
+    b(14410), e(14594), hd(14914), e(15165), e(15699), hd(16021),
+    hd(16274), b(16528), e(16715), m(17063), m(17412), hd(17847),
+    m(18128)
+  ])
 };

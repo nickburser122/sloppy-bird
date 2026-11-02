@@ -42,22 +42,17 @@ describe('LevelRuntime', () => {
     expect(rt.distance).toBe(0);
   });
 
-  it('respawns at the checkpoint once it has been passed', () => {
+  it('has no checkpoint: a death late in the level restarts from the very start', () => {
     const { rt, level } = setup();
-    rt.checkpointed = true;
-    rt.restart();
-    expect(rt.distance).toBe(level.checkpoint);
+    expect(level.checkpoint).toBeUndefined();
+    tuning.debug.invincible = true;
+    for (let i = 0; i < 600; i++) rt.update(DT);
+    tuning.debug.invincible = false;
+    expect(rt.distance).toBeGreaterThan(2000);
     stepUntil(rt, 'dead');
     stepUntil(rt, 'running');
-    expect(rt.distance).toBe(level.checkpoint);
-  });
-
-  it('marks the checkpoint when it is crossed', () => {
-    const { rt, level } = setup();
-    rt.distance = level.checkpoint - 1;
-    rt.next = level.obstacles.length;
-    rt.update(DT);
-    expect(rt.checkpointed).toBe(true);
+    expect(rt.distance).toBe(0);
+    expect(rt.collected).toBe(0);
   });
 
   it('invincibility prevents death', () => {

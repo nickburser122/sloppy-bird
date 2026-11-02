@@ -16,14 +16,16 @@ function entriesFor(wi) {
     scene: 'Level',
     params: { world: wi, index: i }
   }));
-  list.push({
-    id: w.bossId,
-    title: 'Boss',
-    name: w.boss.title,
-    blurb: w.boss.blurb,
-    scene: 'Boss',
-    params: { world: wi }
-  });
+  if (w.boss) {
+    list.push({
+      id: w.bossId,
+      title: 'Boss',
+      name: w.boss.title,
+      blurb: w.boss.blurb,
+      scene: 'Boss',
+      params: { world: wi }
+    });
+  }
   return list;
 }
 
@@ -149,14 +151,12 @@ export class WorldSelectScene extends Scene {
     el.querySelector('h2').textContent = w.name;
     el.querySelector('.lede').textContent =
       w.mode === 'mixed'
-        ? 'The last boss. Every mode, one after another.'
+        ? 'The last boss. Run, flap and flip, switching after every hit.'
         : w.mode === 'flap'
-          ? 'Tap to flap, hold to glide. Four stops through the feed.'
-          : w.mode === 'surf'
-            ? 'Hold to dive, release to fly. Ride the chart.'
-            : w.mode === 'flip'
-              ? 'Tap to flip gravity. Code blocks grow from both sides.'
-              : 'Four stops from hero section to cookie wall. Finish one to unlock the next.';
+          ? 'Tap to flap, hold to glide. Two short levels, no checkpoints.'
+          : w.mode === 'flip'
+            ? 'Tap to flip gravity. Two short levels, no checkpoints.'
+            : 'Tap to jump. Two short levels, no checkpoints. Finish one to unlock the next.';
     el.querySelector('.plans').innerHTML = cards;
     el.querySelectorAll('.plans button').forEach((b) => b.setAttribute('data-ui', ''));
     el.querySelectorAll('.tab').forEach((t) => {

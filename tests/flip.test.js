@@ -4,7 +4,7 @@ import { createPlayer } from '../src/entities/player.js';
 import { compileLevel } from '../src/levels/compile.js';
 import { validateLevel, validateReachability } from '../src/levels/validator.js';
 import { validateBoss } from '../src/levels/bossValidator.js';
-import { flip, chunks } from '../src/levels/chunks/world4.js';
+import { flip, chunks } from '../src/levels/chunks/world3.js';
 import { createObstacle } from '../src/entities/obstacles/types.js';
 import { worlds } from '../src/levels/worlds.js';
 import { tuning, defaults } from '../src/config/tuning.js';
@@ -129,12 +129,21 @@ describe('FLIP validator', () => {
     }, 30000);
   }
 
-  it('accepts every Segfault phase', () => {
-    expect(validateBoss(world4).errors).toEqual([]);
-  }, 30000);
+  it('accepts every flip pattern of the final boss', () => {
+    expect(validateBoss(worlds[3]).errors).toEqual([]);
+  }, 60000);
+
+  const runway = { length: 900, obstacles: [], items: [] };
+  const zigzag = flip(2400, [
+    { block: [500, 120, 'f'] },
+    { block: [900, 120, 'c'] },
+    { block: [1300, 120, 'f'] },
+    { block: [1700, 120, 'c'] },
+    { block: [2100, 120, 'f'] }
+  ]);
 
   function level(chunk) {
-    return compileLevel({ id: 't', name: 't', mode: 'flip', chunks: ['runway', 'c', 'runway'] }, { runway: chunks.runway, c: chunk });
+    return compileLevel({ id: 't', name: 't', mode: 'flip', chunks: ['runway', 'c', 'runway'] }, { runway, c: chunk });
   }
 
   it('rejects a block too tall to pass under on the other side', () => {
@@ -158,7 +167,7 @@ describe('FLIP validator', () => {
 
   it('rejects when flips are only allowed very rarely', () => {
     tuning.validator.flipMinFlipMs = 3000;
-    expect(validateReachability(level(chunks.zigzag)).ok).toBe(false);
+    expect(validateReachability(level(zigzag)).ok).toBe(false);
   });
 });
 

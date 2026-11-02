@@ -26,13 +26,15 @@ describe('a bot playing without invincibility', () => {
       it('clears ' + w.levels[li].id, () => {
         const r = playScene('Level', { world: wi, index: li }, 200);
         expect(r.scene).toBe('Results');
-        expect(r.deaths).toBeLessThanOrEqual(3);
+        expect(r.deaths).toBe(0);
       }, 900000);
     }
-    it('beats ' + w.boss.title, () => {
-      const r = playScene('Boss', { world: wi }, 240);
-      expect(r.scene).toBe('Results');
-      expect(r.deaths).toBeLessThanOrEqual(3);
-    }, 900000);
+    if (w.boss) {
+      it('beats ' + w.boss.title, () => {
+        const r = playScene('Boss', { world: wi }, 240);
+        expect(r.scene).toBe('Results');
+        expect(r.deaths).toBe(0);
+      }, 900000);
+    }
   }
 });

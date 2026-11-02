@@ -8,9 +8,6 @@ export const OBSTACLES = {
   card: { kind: 'solid', dims: 'card', shape: 'rect' },
   bubble: { kind: 'solid', dims: 'bubble', shape: 'circle' },
   like: { kind: 'solid', dims: 'like', shape: 'circle', moving: true },
-  kpi: { kind: 'solid', dims: 'kpi', shape: 'rect' },
-  ticker: { kind: 'solid', dims: 'ticker', shape: 'rect', moving: true, rel: true },
-  nodata: { kind: 'hazard', dims: 'nodata', shape: 'rect', lift: -480 },
   block: { kind: 'solid', dims: 'block', shape: 'rect' },
   float: { kind: 'solid', dims: 'float', shape: 'rect' },
   cursor: { kind: 'hazard', dims: 'cursor', shape: 'rect', lift: 60 }

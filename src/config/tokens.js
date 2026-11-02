@@ -57,26 +57,6 @@ export const themes = {
     onAccent: '#ffffff',
     backdrop: 'feed'
   },
-  dashboard: {
-    ink: '0, 0, 0',
-    bg: '#0d1530',
-    surface: '#16203f',
-    fg: '#e8edff',
-    muted: '#8f9bc4',
-    border: '#28345f',
-    skeleton: '#131c3a',
-    accent: '#38bdf8',
-    glow: 'rgba(56, 189, 248, 0.45)',
-    solid: '#d7e0ff',
-    hazard: '#ff7a45',
-    cookie: '#d9a460',
-    chip: '#5b3a1e',
-    scrim: 'rgba(13, 21, 48, 0.76)',
-    debug: '#fb7185',
-    solidInk: '13, 21, 48',
-    onAccent: '#0d1530',
-    backdrop: 'dashboard'
-  },
   terminal: {
     ink: '0, 0, 0',
     bg: '#0a0e14',

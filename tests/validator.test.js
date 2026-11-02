@@ -15,7 +15,7 @@ describe('level validator', () => {
     });
   }
 
-  it('accepts every boss phase and keeps orbs outside a full jump', () => {
+  it('accepts every final-boss pattern and keeps orbs outside a full jump', () => {
     const result = validateBoss();
     expect(result.errors).toEqual([]);
   });
@@ -35,7 +35,7 @@ describe('level validator', () => {
 
   it('rejects obstacles packed closer than a jump allows', () => {
     const lib = {
-      runway: chunks.runway,
+      runway: { length: 900, obstacles: [], items: [] },
       wall: {
         length: 30000,
         obstacles: [
@@ -47,17 +47,12 @@ describe('level validator', () => {
         ]
       }
     };
-    const level = compileLevel({ id: 't', name: 't', checkpointChunk: 1, chunks: ['runway', 'wall'] }, lib);
+    const level = compileLevel({ id: 't', name: 't', chunks: ['runway', 'wall'] }, lib);
     expect(validateLevel(level).ok).toBe(false);
   });
 
   it('rejects a level outside the duration window', () => {
-    const level = compileLevel({ id: 't', name: 't', checkpointChunk: 1, chunks: ['runway', 'runway'] }, chunks);
+    const level = compileLevel({ id: 't', name: 't', chunks: ['runway', 'runway'] }, { runway: { length: 900, obstacles: [], items: [] } });
     expect(validateLevel(level).errors.join(' ')).toMatch(/duration/);
-  });
-
-  it('rejects a checkpoint far from the midpoint', () => {
-    const def = { ...levels[0], checkpointChunk: 2 };
-    expect(validateLevel(compileLevel(def, chunks)).errors.join(' ')).toMatch(/checkpoint/);
   });
 });

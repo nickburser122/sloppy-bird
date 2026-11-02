@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { worlds } from '../src/levels/worlds.js';
-import { POWERS } from '../src/engine/powerups.js';
 import { tuning } from '../src/config/tuning.js';
 import { DT, makeApp } from './helpers.js';
 
@@ -42,8 +41,6 @@ function fuzz(sceneName, params, seed) {
       app.width = 360 + Math.floor(rand() * 1400);
       app.height = 320 + Math.floor(rand() * 700);
     }
-    const sc = app.scenes.current;
-    if (name !== 'Pause' && sc.runtime && rand() < 0.003) sc.runtime.power.activate(POWERS[Math.floor(rand() * POWERS.length)]);
     app.input.update(DT * 1000);
     app.scenes.update(DT);
     if (i % 5 === 0) app.scenes.render(rand());
@@ -56,7 +53,6 @@ function fuzz(sceneName, params, seed) {
       expect(['running', 'dead', 'won']).toContain(rt.state);
       expect(rt.pool.count).toBeLessThanOrEqual(tuning.level.poolSize);
       expect(cur.particles.pool.count).toBeLessThanOrEqual(tuning.fx.maxParticles);
-      expect(rt.bullets.count).toBeLessThanOrEqual(tuning.blaster.max);
       deaths = rt.deaths;
     }
   }
@@ -71,7 +67,7 @@ afterEach(() => {
   tuning.debug.invincible = false;
 });
 
-describe('fuzzing with random input, resizes, pauses and power-ups', () => {
+describe('fuzzing with random input, resizes and pauses', () => {
   for (let wi = 0; wi < worlds.length; wi++) {
     const w = worlds[wi];
     for (let li = 0; li < w.levels.length; li++) {
@@ -79,9 +75,11 @@ describe('fuzzing with random input, resizes, pauses and power-ups', () => {
         expect(() => fuzz('Level', { world: wi, index: li }, 1000 + wi * 10 + li)).not.toThrow();
       });
     }
-    it(w.bossId + ' stays consistent', () => {
-      expect(() => fuzz('Boss', { world: wi }, 5000 + wi)).not.toThrow();
-    });
+    if (w.boss) {
+      it(w.boss.title + ' stays consistent', () => {
+        expect(() => fuzz('Boss', { world: wi }, 5000 + wi)).not.toThrow();
+      });
+    }
   }
 
   it('actually exercises deaths and restarts', () => {

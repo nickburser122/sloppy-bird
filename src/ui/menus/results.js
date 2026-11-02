@@ -11,10 +11,17 @@ export class ResultsScene extends Scene {
     const wi = params.world || 0;
     const world = worlds[wi];
     applyTheme(world.theme);
-    const levelCount = world.levels.length;
     const boss = params.kind === 'boss';
     const noun = boss ? 'Bugs filed' : 'Tokens';
-    const hasNext = !boss || wi < worlds.length - 1;
+    let next = null;
+    if (!boss && params.index < world.levels.length - 1) next = { label: 'Next level', scene: 'Level', params: { world: wi, index: params.index + 1 } };
+    else if (!boss && world.boss) next = { label: 'Face the boss', scene: 'Boss', params: { world: wi } };
+    else if (wi < worlds.length - 1) {
+      const nw = worlds[wi + 1];
+      next = nw.levels.length
+        ? { label: 'Next world', scene: 'Level', params: { world: wi + 1, index: 0 } }
+        : { label: 'Face the boss', scene: 'Boss', params: { world: wi + 1 } };
+    }
     const title = boss ? world.name + ' cleared' : 'Level ' + (params.index + 1) + ' complete';
     const ratio = params.total > 0 ? params.collected / params.total : 0;
     const el = this.mount(
@@ -38,9 +45,9 @@ export class ResultsScene extends Scene {
         clock(params.time) +
         '</dd></div></dl>' +
         (params.cheated ? '<p class="note">Debug tools were used, so this run counts as one star.</p>' : '') +
-        (boss && wi === worlds.length - 1 ? '<p class="note">That was every world. Thanks for playing.</p>' : '') +
+        (!next ? '<p class="note">That was every world. Thanks for playing.</p>' : '') +
         '<div class="actions">' +
-        (hasNext ? '<button type="button" class="cta" data-act="next">' + (boss ? 'Next world' : params.index >= levelCount - 1 ? 'Face the boss' : 'Next level') + '</button>' : '') +
+        (next ? '<button type="button" class="cta" data-act="next">' + next.label + '</button>' : '') +
         '<button type="button" class="cta ghost" data-act="again">Replay</button>' +
         '<button type="button" class="cta ghost" data-act="levels">Level select</button></div>',
       'card results'
@@ -52,9 +59,7 @@ export class ResultsScene extends Scene {
       this.app.audio.play('click');
       if (act === 'levels') this.app.scenes.go('WorldSelect', { world: wi });
       else if (act === 'again') this.app.scenes.go(boss ? 'Boss' : 'Level', { world: wi, index: params.index });
-      else if (boss) this.app.scenes.go('Level', { world: wi + 1, index: 0 });
-      else if (params.index >= levelCount - 1) this.app.scenes.go('Boss', { world: wi });
-      else this.app.scenes.go('Level', { world: wi, index: params.index + 1 });
+      else if (next) this.app.scenes.go(next.scene, next.params);
     });
     const first = el.querySelector('button');
     if (first) first.focus();

@@ -1,10 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { drawBackdrop, drawGround, drawPlayer, drawObstacle, drawToken, drawOrb, drawPower, drawBullet, drawShield, drawTerrain } from '../src/levels/draw.js';
+import { drawBackdrop, drawGround, drawPlayer, drawObstacle, drawToken, drawOrb, drawShield } from '../src/levels/draw.js';
 import { bossLayout } from '../src/entities/bosses/shared.js';
 import { worlds } from '../src/levels/worlds.js';
 import { OBSTACLES, createObstacle } from '../src/entities/obstacles/types.js';
-import { POWERS } from '../src/engine/powerups.js';
-import { Terrain, hills } from '../src/levels/terrain.js';
 import { themes, applyTheme, motion, quality } from '../src/config/tokens.js';
 import { tuning } from '../src/config/tuning.js';
 
@@ -41,50 +39,33 @@ describe('every drawing routine runs in every theme and state', () => {
   for (const theme of Object.keys(themes)) {
     for (const reduced of [false, true]) {
       for (const shadows of [true, false]) {
-        it(theme + (reduced ? ' reduced-motion' : '') + (shadows ? '' : ' low-quality') + ': scenery, obstacles, pickups, player', () => {
+        it(theme + (reduced ? ' reduced-motion' : '') + (shadows ? '' : ' low-quality') + ': scenery, obstacles, player', () => {
           applyTheme(theme, fakeRoot);
           motion.reduced = reduced;
           quality.shadows = shadows;
           const ctx = fakeCtx();
           drawBackdrop(ctx, 1000, 500, 1234);
-          for (const mode of ['run', 'flap', 'flip', 'surf', 'mixed']) drawGround(ctx, 1000, 500, 77, mode);
+          for (const mode of ['run', 'flap', 'flip', 'mixed']) drawGround(ctx, 1000, 500, 77, mode);
           for (const type of Object.keys(OBSTACLES)) {
-            for (const destructible of [false, true]) {
-              const o = createObstacle({ type, at: 0, lift: type === 'nodata' ? undefined : 40, h: type === 'card' ? 120 : undefined, from: type === 'card' ? 'top' : undefined, destructible }, 0, 320);
-              expect(() => drawObstacle(ctx, o, 300, 500, 1.3, 500)).not.toThrow();
-            }
+            const o = createObstacle({ type, at: 0, lift: 40, h: type === 'card' ? 120 : undefined, from: type === 'card' ? 'top' : undefined }, 0, 320);
+            expect(() => drawObstacle(ctx, o, 300, 500, 1.3, 500)).not.toThrow();
           }
-          for (const k of POWERS) expect(() => drawPower(ctx, 100, 100, k, 2)).not.toThrow();
           expect(() => {
             drawToken(ctx, 10, 10, 12);
             drawOrb(ctx, 10, 10, 20, 1);
-            drawBullet(ctx, 5, 5);
             drawShield(ctx, 5, 5, 40, 0.5);
             drawPlayer(ctx, 100, 100, 40, 1, 0.3);
             drawPlayer(ctx, 100, 100, 40, 0.5, 0);
           }).not.toThrow();
-          const t = new Terrain();
-          for (const [x, y] of hills(3000, [150, 140, 150], 50)) t.addPoint(x, y);
-          t.addGap(1000, 1200);
-          t.seal();
-          expect(() => drawTerrain(ctx, 1000, 500, 900, t, 220)).not.toThrow();
           expect(ctx.__calls.length).toBeGreaterThan(50);
         });
       }
     }
   }
-
-  it('terrain drawing handles very wide screens without reallocating per frame', () => {
-    const ctx = fakeCtx();
-    const t = new Terrain();
-    t.addPoint(0, 50);
-    t.addPoint(100000, 150);
-    for (const w of [320, 1920, 5000, 320]) expect(() => drawTerrain(ctx, w, 500, 0, t, 100)).not.toThrow();
-  });
 });
 
 describe('boss artwork', () => {
-  for (const w of worlds) {
+  for (const w of worlds.filter((x) => x.boss)) {
     for (const flash of [-1, 0, 350, 700]) {
       for (const phase of [0, 1, 2, 3]) {
         it(w.boss.title + ' draws at flash ' + flash + ' phase ' + phase, () => {

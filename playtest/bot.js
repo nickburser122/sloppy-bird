@@ -8,8 +8,7 @@ import { DT } from '../tests/helpers.js';
 const FIELDS = {
   run: ['vy', 'grounded', 'coyote', 'jumping'],
   flap: ['vy', 'held', 'heldMs', 'glideLeft', 'gliding'],
-  flip: ['vy', 'dir', 'since', 'rot'],
-  surf: ['d', 'dx', 'lift', 'vUp', 'riding', 'held', 'boost', 'slope']
+  flip: ['vy', 'dir', 'since', 'rot']
 };
 
 function plansFor(kind) {
@@ -18,6 +17,22 @@ function plansFor(kind) {
     for (let t = 0; t <= 240; t += 20) for (let h = 0; h <= 400; h += 20) out.push({ s0: false, ev: [{ t, e: 'press' }, { t: t + h, e: 'release' }] });
     out.push({ s0: true, ev: [] });
     for (let r = 0; r <= 400; r += 20) out.push({ s0: true, ev: [{ t: r, e: 'release' }] });
+    for (let t = 0; t <= 240; t += 40) {
+      for (const h of [0, 60, 120, 200, 400]) {
+        for (let g = 250; g <= 700; g += 50) {
+          for (const h2 of [0, 100, 200, 400]) {
+            const a = t + h;
+            const b = a + g;
+            out.push({ s0: false, ev: [{ t, e: 'press' }, { t: a, e: 'release' }, { t: b, e: 'press' }, { t: b + h2, e: 'release' }] });
+          }
+        }
+      }
+    }
+    for (let r = 0; r <= 400; r += 40) {
+      for (let g = 250; g <= 700; g += 50) {
+        for (const h2 of [0, 100, 200, 400]) out.push({ s0: true, ev: [{ t: r, e: 'release' }, { t: r + g, e: 'press' }, { t: r + g + h2, e: 'release' }] });
+      }
+    }
   } else if (kind === 'flap') {
     for (const per of [150, 170, 190, 210, 240, 280, 340, 420, 600]) {
       for (const off of [0, 40, 80, 120]) {
@@ -41,24 +56,6 @@ function plansFor(kind) {
     for (let t = 0; t <= 700; t += 25) g.push(t);
     for (const a of g) out.push({ s0: false, ev: [{ t: a, e: 'tap' }] });
     for (const a of g) for (const b of g) if (b >= a + 100) out.push({ s0: false, ev: [{ t: a, e: 'tap' }, { t: b, e: 'tap' }] });
-  } else {
-    const g = [];
-    for (let t = 45; t <= 900; t += 45) g.push(t);
-    for (const s0 of [false, true]) {
-      out.push({ s0, ev: [] });
-      for (const a of g) {
-        const e1 = { t: a, e: s0 ? 'release' : 'press' };
-        out.push({ s0, ev: [e1] });
-        for (const b of g) {
-          if (b < a + 90) continue;
-          out.push({ s0, ev: [e1, { t: b, e: s0 ? 'press' : 'release' }] });
-          for (const c of g) {
-            if (c < b + 90) continue;
-            out.push({ s0, ev: [e1, { t: b, e: s0 ? 'press' : 'release' }, { t: c, e: s0 ? 'release' : 'press' }] });
-          }
-        }
-      }
-    }
   }
   return out;
 }
@@ -88,7 +85,6 @@ export function makeBot(sc, app) {
     pl.x = sc.player.x; pl.y = sc.player.y; pl.prevY = sc.player.prevY; pl.size = sc.player.size;
     const gy = sc.env.groundY();
     let d = rt.distance;
-    const slow = rt.power.speedMul();
     const level = sc.level;
     const obs = level.obstacles;
     let lo = 0;
@@ -113,7 +109,7 @@ export function makeBot(sc, app) {
         } else if (ev.e === 'release') { mode.onRelease(); held = false; }
       }
       if (held) { mode.onHold(heldMs); heldMs += DT * 1000; }
-      const mul = (mode.speedMul ? mode.speedMul() : 1) * slow;
+      const mul = mode.speedMul ? mode.speedMul() : 1;
       const step = level.speedAt(d) * mul * DT;
       mode.d = d + step;
       mode.dx = step;
@@ -126,7 +122,6 @@ export function makeBot(sc, app) {
         const sx = px + o.x - d;
         if (sx > px + 200) break;
         if (sx + o.w < px - 10) continue;
-        if (o.destroyed) continue;
         if (obstacleHits(hb, o, sx, gy, d, box, circle)) return { alive: false, n };
       }
       if (orb && !orb.got) {

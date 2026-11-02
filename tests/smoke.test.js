@@ -25,7 +25,7 @@ describe('scene smoke tests', () => {
       expect(app.save.stars(world.levels[0].id)).toBe(1);
     });
 
-    it(world.name + ': the boss fight can be played to a win', () => {
+    if (world.boss) it(world.name + ': the boss fight can be played to a win', () => {
       const app = makeApp(1000, 700);
       let result = null;
       const go = app.scenes.go.bind(app.scenes);
@@ -34,11 +34,11 @@ describe('scene smoke tests', () => {
         go(name, params);
       };
       app.scenes.go('Boss', { world: wi });
-      drive(app, 120 * 200, 40);
+      drive(app, 120 * 120, 40);
       expect(app.scenes.name).toBe('Results');
       expect(app.save.completed(world.bossId)).toBe(true);
-      expect(result.time).toBeGreaterThanOrEqual(60);
-      expect(result.time).toBeLessThanOrEqual(90);
+      expect(result.time).toBeGreaterThanOrEqual(15);
+      expect(result.time).toBeLessThanOrEqual(45);
     });
 
     it(world.name + ': small landscape screens scale the world down instead of clipping it', () => {
@@ -49,7 +49,7 @@ describe('scene smoke tests', () => {
       const scene = app.scenes.current;
       expect(scene.sc).toBeLessThan(1);
       expect(scene.env.groundY() - tuning.view.hudH / scene.sc).toBeGreaterThan(
-        (world.mode === 'flap' ? tuning.flap.fieldH : world.mode === 'flip' ? tuning.flip.fieldH : world.mode === 'surf' ? tuning.surf.field : tuning.run.field) - 1
+        (world.mode === 'flap' ? tuning.flap.fieldH : world.mode === 'flip' ? tuning.flip.fieldH : tuning.run.field) - 1
       );
     });
   }
@@ -65,12 +65,12 @@ describe('scene smoke tests', () => {
     expect(app.scenes.under).toBe(null);
   });
 
-  it('level select unlocks across worlds only after the previous boss', () => {
+  it('level select unlocks across worlds only after the previous world is finished', () => {
     const app = makeApp(1000, 700);
     app.scenes.go('WorldSelect', { world: 1 });
     const first = app.overlay.querySelector('.cta[data-i="0"]');
     expect(first.disabled).toBe(true);
-    for (const id of allOrder.slice(0, 4)) app.save.record(id, { stars: 1, time: 60, retries: 1 });
+    for (const id of allOrder.slice(0, 2)) app.save.record(id, { stars: 1, time: 60, retries: 1 });
     app.scenes.go('WorldSelect', { world: 1 });
     expect(app.overlay.querySelector('.cta[data-i="0"]').disabled).toBe(false);
     app.overlay.querySelector('.cta[data-i="0"]').click();
@@ -78,14 +78,20 @@ describe('scene smoke tests', () => {
     expect(app.scenes.current.worldIndex).toBe(1);
   });
 
-  it('results offer the next world after a boss and none after the last', () => {
+  it('results lead on to the next world and the final boss, and nothing after it', () => {
     const app = makeApp(1000, 700);
-    app.scenes.go('Results', { kind: 'boss', world: 0, index: 3, stars: 2, deaths: 1, time: 70, collected: 9, total: 10 });
+    app.scenes.go('Results', { kind: 'level', world: 0, index: 0, stars: 2, deaths: 1, time: 28, collected: 9, total: 10 });
+    expect(app.overlay.querySelector('[data-act="next"]').textContent).toBe('Next level');
+    app.scenes.go('Results', { kind: 'level', world: 0, index: 1, stars: 2, deaths: 1, time: 28, collected: 9, total: 10 });
     expect(app.overlay.querySelector('[data-act="next"]').textContent).toBe('Next world');
     app.overlay.querySelector('[data-act="next"]').click();
     expect(app.scenes.name).toBe('Level');
     expect(app.scenes.current.worldIndex).toBe(1);
-    app.scenes.go('Results', { kind: 'boss', world: worlds.length - 1, index: 3, stars: 2, deaths: 1, time: 70, collected: 9, total: 10 });
+    app.scenes.go('Results', { kind: 'level', world: 2, index: 1, stars: 2, deaths: 1, time: 28, collected: 9, total: 10 });
+    expect(app.overlay.querySelector('[data-act="next"]').textContent).toBe('Face the boss');
+    app.overlay.querySelector('[data-act="next"]').click();
+    expect(app.scenes.name).toBe('Boss');
+    app.scenes.go('Results', { kind: 'boss', world: worlds.length - 1, index: 0, stars: 2, deaths: 1, time: 28, collected: 5, total: 5 });
     expect(app.overlay.querySelector('[data-act="next"]')).toBe(null);
   });
 

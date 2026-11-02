@@ -81,22 +81,6 @@ function drawFeedBackdrop(ctx, w, gy, scroll) {
   }
 }
 
-function drawDashboardBackdrop(ctx, w, gy, scroll) {
-  ctx.strokeStyle = colors.skeleton;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let y = gy; y > 40; y -= 60) {
-    ctx.moveTo(0, Math.round(y) + 0.5);
-    ctx.lineTo(w, Math.round(y) + 0.5);
-  }
-  const vx = 160;
-  for (let x = -((scroll * 0.3) % vx); x < w; x += vx) {
-    ctx.moveTo(Math.round(x) + 0.5, 40);
-    ctx.lineTo(Math.round(x) + 0.5, gy);
-  }
-  ctx.stroke();
-}
-
 const CODE_LINES = [
   [0, 220],
   [1, 150],
@@ -133,7 +117,6 @@ function drawTerminalBackdrop(ctx, w, gy, scroll) {
 
 export function drawBackdrop(ctx, w, gy, scroll) {
   if (colors.backdrop === 'terminal') drawTerminalBackdrop(ctx, w, gy, scroll);
-  else if (colors.backdrop === 'dashboard') drawDashboardBackdrop(ctx, w, gy, scroll);
   else if (colors.backdrop === 'feed') drawFeedBackdrop(ctx, w, gy, scroll);
   else drawSkeletonBackdrop(ctx, w, gy, scroll);
 }
@@ -198,13 +181,6 @@ function drawHazard(ctx, o, x, gy, time) {
   ctx.roundRect(x + 0.5, top + 0.5, o.w - 1, o.h - 1, r);
   ctx.strokeStyle = colors.hazard;
   ctx.stroke();
-  if (o.type === 'nodata') {
-    ctx.fillStyle = colors.hazard;
-    ctx.font = '600 11px ' + tokens.font.mono;
-    ctx.textAlign = 'center';
-    ctx.fillText('NO DATA', x + o.w / 2, top + 22);
-    ctx.textAlign = 'start';
-  }
 }
 
 function drawButton(ctx, o, x, gy) {
@@ -331,170 +307,6 @@ function drawLike(ctx, o, x, gy, d) {
 
 const KPI_TEXT = ['+12.4%', '$4.2M', 'NPS 71', '-3.1%', '98.7%', '14.2k'];
 
-function drawKpi(ctx, o, x, gy, d, ticker) {
-  const y = gy - obstacleLift(o, d) - o.h;
-  if (ticker && !motion.reduced) {
-    for (let i = 0; i < TRAIL.length; i++) {
-      ctx.save();
-      ctx.globalAlpha = 0.16 - i * 0.07;
-      ctx.fillStyle = colors.solid;
-      ctx.beginPath();
-      ctx.roundRect(x + TRAIL[i], gy - obstacleLift(o, d - TRAIL[i]) - o.h, o.w, o.h, radius.m);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-  ctx.save();
-  shade(ctx, shadowColor(2), tokens.shadow[2].blur, tokens.shadow[2].y);
-  ctx.fillStyle = colors.solid;
-  ctx.beginPath();
-  ctx.roundRect(x, y, o.w, o.h, radius.m);
-  ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = ink(0.5);
-  ctx.beginPath();
-  ctx.roundRect(x + 12, y + 11, o.w * 0.3, 5, 2.5);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(' + colors.solidInk + ', 0.9)';
-  ctx.font = '600 ' + (ticker ? 15 : 20) + 'px ' + tokens.font.mono;
-  ctx.textBaseline = 'alphabetic';
-  const label = KPI_TEXT[Math.floor(Math.abs(o.x) / 10) % KPI_TEXT.length];
-  if (ticker) {
-    ctx.beginPath();
-    ctx.moveTo(x + 14, y + o.h - 14);
-    ctx.lineTo(x + 22, y + o.h - 28);
-    ctx.lineTo(x + 30, y + o.h - 14);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillText(label, x + 38, y + o.h - 14);
-  } else {
-    ctx.fillText(label, x + 12, y + o.h - 16);
-    ctx.strokeStyle = ink(0.34);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    const sx = x + o.w - 52;
-    ctx.moveTo(sx, y + o.h - 14);
-    ctx.lineTo(sx + 12, y + o.h - 22);
-    ctx.lineTo(sx + 24, y + o.h - 18);
-    ctx.lineTo(sx + 40, y + o.h - 30);
-    ctx.stroke();
-  }
-}
-
-let heights = new Float32Array(512);
-
-export function drawTerrain(ctx, width, gy, scroll, terrain, px) {
-  const step = 8;
-  const n = Math.ceil(width / step) + 2;
-  if (n > heights.length) heights = new Float32Array(n * 2);
-  for (let i = 0; i < n; i++) heights[i] = gy - terrain.height(scroll + i * step - px);
-  const bottom = gy + 600;
-  ctx.beginPath();
-  ctx.moveTo(0, bottom);
-  for (let i = 0; i < n; i++) ctx.lineTo(i * step, heights[i]);
-  ctx.lineTo((n - 1) * step, bottom);
-  ctx.closePath();
-  ctx.save();
-  ctx.globalAlpha = 0.14;
-  ctx.fillStyle = colors.accent;
-  ctx.fill();
-  ctx.restore();
-  ctx.beginPath();
-  ctx.moveTo(0, heights[0]);
-  for (let i = 1; i < n; i++) ctx.lineTo(i * step, heights[i]);
-  ctx.strokeStyle = colors.accent;
-  ctx.lineWidth = 3;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-}
-
-function dashedShape(ctx, o, x, gy, d) {
-  const lift = obstacleLift(o, d);
-  const y = gy - lift - o.h;
-  ctx.save();
-  ctx.setLineDash([6, 5]);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = colors.solid;
-  ctx.fillStyle = colors.solid;
-  ctx.beginPath();
-  if (o.shape === 'circle') ctx.arc(x + o.w / 2, y + o.h / 2, o.w / 2 - 1, 0, Math.PI * 2);
-  else ctx.roundRect(x + 1, y + 1, o.w - 2, o.h - 2, Math.min(radius.m, o.h / 2));
-  ctx.globalAlpha = 0.16;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
-  if (o.w >= 40 && o.h >= 26) {
-    const cx = x + o.w / 2;
-    const cy = y + o.h / 2;
-    ctx.fillStyle = colors.solid;
-    ctx.beginPath();
-    ctx.moveTo(cx - 5, cy - 7);
-    ctx.lineTo(cx + 7, cy);
-    ctx.lineTo(cx - 5, cy + 7);
-    ctx.closePath();
-    ctx.fill();
-  }
-}
-
-export function drawPower(ctx, x, y, kind, time) {
-  const r = tuning.pickup.r;
-  const bob = motion.reduced ? 0 : Math.sin(time * 4 + x * 0.01) * 3;
-  const cy = y + bob;
-  ctx.save();
-  shade(ctx, colors.glow, tokens.shadow[2].blur);
-  ctx.fillStyle = colors.accent;
-  ctx.beginPath();
-  ctx.arc(x, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  ctx.strokeStyle = colors.surface;
-  ctx.fillStyle = colors.surface;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  if (kind === 'shield') {
-    ctx.moveTo(x, cy - 8);
-    ctx.lineTo(x + 7, cy - 5);
-    ctx.lineTo(x + 6, cy + 3);
-    ctx.lineTo(x, cy + 9);
-    ctx.lineTo(x - 6, cy + 3);
-    ctx.lineTo(x - 7, cy - 5);
-    ctx.closePath();
-    ctx.stroke();
-  } else if (kind === 'blaster') {
-    ctx.moveTo(x + 2, cy - 9);
-    ctx.lineTo(x - 5, cy + 1);
-    ctx.lineTo(x, cy + 1);
-    ctx.lineTo(x - 2, cy + 9);
-    ctx.lineTo(x + 6, cy - 2);
-    ctx.lineTo(x + 1, cy - 2);
-    ctx.closePath();
-    ctx.fill();
-  } else if (kind === 'magnet') {
-    ctx.moveTo(x - 6, cy - 7);
-    ctx.lineTo(x - 6, cy + 1);
-    ctx.arc(x, cy + 1, 6, Math.PI, 0, true);
-    ctx.lineTo(x + 6, cy - 7);
-    ctx.stroke();
-  } else {
-    ctx.arc(x, cy, 8, 0, Math.PI * 2);
-    ctx.moveTo(x, cy - 5);
-    ctx.lineTo(x, cy);
-    ctx.lineTo(x + 4, cy + 2);
-    ctx.stroke();
-  }
-}
-
-export function drawBullet(ctx, x, y) {
-  ctx.fillStyle = colors.accent;
-  ctx.beginPath();
-  ctx.roundRect(x, y, tuning.blaster.w, tuning.blaster.h, 3);
-  ctx.fill();
-}
-
 export function drawShield(ctx, x, y, size, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -533,10 +345,7 @@ function drawCode(ctx, o, x, gy) {
 }
 
 export function drawObstacle(ctx, o, x, gy, time, d) {
-  if (o.destructible) dashedShape(ctx, o, x, gy, d);
-  else if (o.type === 'block' || o.type === 'float') drawCode(ctx, o, x, gy);
-  else if (o.type === 'kpi') drawKpi(ctx, o, x, gy, d, false);
-  else if (o.type === 'ticker') drawKpi(ctx, o, x, gy, d, true);
+  if (o.type === 'block' || o.type === 'float') drawCode(ctx, o, x, gy);
   else if (o.kind === 'hazard') drawHazard(ctx, o, x, gy, time);
   else if (o.type === 'modal') drawModal(ctx, o, x, gy);
   else if (o.type === 'card') drawCard(ctx, o, x, gy);
@@ -545,24 +354,8 @@ export function drawObstacle(ctx, o, x, gy, time, d) {
   else drawButton(ctx, o, x, gy);
 }
 
-export function drawToken(ctx, x, y, r, bonus) {
+export function drawToken(ctx, x, y, r) {
   const s = r * 1.7;
-  if (bonus) {
-    ctx.save();
-    ctx.fillStyle = colors.accent;
-    ctx.strokeStyle = colors.surface;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, y - s * 0.62);
-    ctx.lineTo(x + s * 0.62, y);
-    ctx.lineTo(x, y + s * 0.62);
-    ctx.lineTo(x - s * 0.62, y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
   ctx.fillStyle = colors.surface;
   ctx.strokeStyle = colors.accent;
   ctx.lineWidth = 1.5;

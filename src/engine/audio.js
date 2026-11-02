@@ -10,28 +10,15 @@ export const SOUNDS = {
     { type: 'sawtooth', from: 320, to: 60, dur: 0.3, gain: 0.3 },
     { noise: true, freq: 900, dur: 0.2, gain: 0.22 }
   ],
-  checkpoint: [
-    { type: 'triangle', from: 660, to: 660, dur: 0.12, gain: 0.4 },
-    { type: 'triangle', from: 990, to: 990, dur: 0.2, gain: 0.4, delay: 0.1 }
-  ],
   win: [
     { type: 'triangle', from: 523, to: 523, dur: 0.14, gain: 0.4 },
     { type: 'triangle', from: 659, to: 659, dur: 0.14, gain: 0.4, delay: 0.12 },
     { type: 'triangle', from: 784, to: 784, dur: 0.14, gain: 0.4, delay: 0.24 },
     { type: 'triangle', from: 1047, to: 1047, dur: 0.32, gain: 0.4, delay: 0.36 }
   ],
-  power: [
-    { type: 'triangle', from: 440, to: 880, dur: 0.12, gain: 0.35 },
-    { type: 'triangle', from: 660, to: 1320, dur: 0.16, gain: 0.3, delay: 0.08 }
-  ],
   shatter: [
     { noise: true, freq: 5000, dur: 0.22, gain: 0.3 },
     { type: 'square', from: 900, to: 200, dur: 0.2, gain: 0.18 }
-  ],
-  shoot: [{ type: 'square', from: 900, to: 500, dur: 0.05, gain: 0.07 }],
-  break: [
-    { noise: true, freq: 2600, dur: 0.14, gain: 0.25 },
-    { type: 'triangle', from: 300, to: 120, dur: 0.12, gain: 0.22 }
   ],
   switch: [
     { type: 'sawtooth', from: 200, to: 900, dur: 0.22, gain: 0.2 },

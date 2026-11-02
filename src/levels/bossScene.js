@@ -4,7 +4,7 @@ import { tuning } from '../config/tuning.js';
 import { colors } from '../config/tokens.js';
 import { LevelRuntime } from './runtime.js';
 import { createMode } from '../modes/index.js';
-import { BossDirector, createBossLevel, telegraphBoost } from './boss.js';
+import { BossDirector, createBossLevel } from './boss.js';
 import { computeStars } from './scoring.js';
 import { bossLayout } from '../entities/bosses/shared.js';
 
@@ -14,12 +14,16 @@ export class BossScene extends LevelScene {
     this.cfg = cfg;
     this.index = this.world.levels.length;
     this.def = { id: this.world.bossId };
-    this.level = createBossLevel({ id: this.world.bossId, name: cfg.title, mode: this.modeKind, speedMul: cfg.speedMul, mixed: !!cfg.modes });
+    this.level = createBossLevel({ id: this.world.bossId, name: cfg.title, mode: this.modeKind, speedMul: cfg.speedMul });
     this.runtime = new LevelRuntime(this.level, this.mode, this.env, { assist: this.assistOn() });
     this.director = new BossDirector(this.level, this.runtime, () => this.gap(), cfg.patterns, cfg.orbLift, cfg.orbGap, cfg.restPx, cfg.phaseSize);
     this.director.onHit = (dead) => this.fireBug(dead);
+    this.startMode = this.modeKind;
+    this.runtime.onRestart = () => {
+      this.director.reset();
+      if (this.modeKind !== this.startMode) this.switchMode(this.startMode);
+    };
     this.seenRestart = this.runtime.restartCount;
-    this.showCheckpoint = false;
     this.bugs = new Pool(4, () => ({ x: 0, y: 0, last: false }));
     this.telegraphT = -1;
     this.label = '';
@@ -42,7 +46,7 @@ export class BossScene extends LevelScene {
   }
 
   hudConfig() {
-    return { world: this.world.name, title: 'Boss', checkpointPct: null, countLabel: 'Bugs filed' };
+    return { world: this.world.name, title: 'Boss', countLabel: 'Bugs filed' };
   }
 
   progress() {
@@ -51,7 +55,7 @@ export class BossScene extends LevelScene {
       value: d.hp / d.total,
       text: d.hp + '/' + d.total,
       count: String(d.hits),
-      mode: this.cfg.modes ? this.modeKind.toUpperCase() : ''
+      mode: this.modeKind.toUpperCase()
     };
   }
 
@@ -116,12 +120,12 @@ export class BossScene extends LevelScene {
     d.update();
 
     const cur = d.cur;
-    if (cur && cur.mode !== this.modeKind && rt.state === 'running' && rt.distance >= this.level.checkpoint) {
+    if (cur && cur.mode !== this.modeKind && rt.state === 'running' && rt.distance >= this.level.switchAt) {
       this.switchMode(cur.mode);
     }
     if (cur && !cur.telegraphed && !cur.done && !d.defeated) {
       const first = this.level.obstacles[cur.firstIdx];
-      const lead = (this.level.speedAt(rt.distance) * telegraphBoost(cur.mode) * tuning.boss.telegraphMs) / 1000;
+      const lead = (this.level.speedAt(rt.distance) * tuning.boss.telegraphMs) / 1000;
       if (first.x - rt.distance - this.gap() <= lead) {
         cur.telegraphed = true;
         this.telegraphT = 0;

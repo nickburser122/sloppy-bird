@@ -58,7 +58,7 @@ describe('particles', () => {
 
 describe('audio', () => {
   it('defines every voice and tolerates play before unlock', () => {
-    for (const name of ['jump', 'land', 'death', 'checkpoint', 'win', 'click']) {
+    for (const name of ['jump', 'land', 'death', 'win', 'click', 'shatter', 'switch']) {
       expect(SOUNDS[name].length).toBeGreaterThan(0);
     }
     expect(() => new Sound().play('jump')).not.toThrow();

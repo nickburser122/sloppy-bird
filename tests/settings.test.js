@@ -4,7 +4,6 @@ import { SaveStore, SAVE_KEY } from '../src/save.js';
 import { LevelRuntime } from '../src/levels/runtime.js';
 import { createMode } from '../src/modes/index.js';
 import { createPlayer } from '../src/entities/player.js';
-import { Terrain, hills } from '../src/levels/terrain.js';
 import { createObstacle } from '../src/entities/obstacles/types.js';
 import { Input } from '../src/engine/input.js';
 import { tuning } from '../src/config/tuning.js';
@@ -96,20 +95,12 @@ describe('assist: the same course at 80% speed', () => {
       obstacles: [],
       items: [],
       length: 1e9,
-      checkpoint: 0,
       tokenTotal: 0,
-      speedAt: () => tuning.world.speed,
-      terrain: null
+      speedAt: () => tuning.world.speed
     };
-    if (kind === 'surf') {
-      level.terrain = new Terrain();
-      for (const [x, y] of hills(8000, [150, 140, 150, 130, 150, 140, 150, 130], 50)) level.terrain.addPoint(x, y);
-      level.terrain.seal();
-    }
     const env = {
       width: () => 1000,
-      groundY: () => 500,
-      terrain: (d) => (level.terrain ? level.terrain.height(d) : 0)
+      groundY: () => 500
     };
     const mode = createMode(kind, player, env);
     const rt = new LevelRuntime(level, mode, env);
@@ -177,18 +168,6 @@ describe('assist: the same course at 80% speed', () => {
     for (const d of [380, 500, 800, 1000]) expect(Math.abs(a.at(d) - b.at(d))).toBeLessThan(14);
   });
 
-  it('SURF: same ride over the same hills', () => {
-    const script = [
-      { d: 200, act: 'press' },
-      { d: 1100, act: 'release' },
-      { d: 1700, act: 'press' },
-      { d: 2600, act: 'release' }
-    ];
-    const a = simulate('surf', 1, script, 3500);
-    const b = simulate('surf', ASSIST.timeScale, script, 3500);
-    for (const d of [900, 1500, 2200, 3200]) expect(Math.abs(a.at(d) - b.at(d))).toBeLessThan(12);
-  });
-
   function runtime(assist) {
     const player = createPlayer();
     const env = { width: () => 1000, groundY: () => 500 };
@@ -198,7 +177,6 @@ describe('assist: the same course at 80% speed', () => {
       obstacles: [createObstacle({ type: 'button', at: 700 }, 0), createObstacle({ type: 'button', at: 2600 }, 0)],
       items: [],
       length: 1e6,
-      checkpoint: 0,
       tokenTotal: 0,
       speedAt: () => tuning.world.speed
     };
@@ -207,18 +185,18 @@ describe('assist: the same course at 80% speed', () => {
 
   it('starts every attempt with a shield, including after a respawn', () => {
     const rt = runtime(true);
-    expect(rt.power.is('shield')).toBe(true);
+    expect(rt.shield).toBe(true);
     for (let i = 0; i < 600 && rt.state !== 'dead'; i++) rt.update(DT);
     expect(rt.state).toBe('running');
     for (let i = 0; i < 600 && rt.state !== 'dead'; i++) rt.update(DT);
     expect(rt.state).toBe('dead');
     for (let i = 0; i < 60; i++) rt.update(DT);
     expect(rt.state).toBe('running');
-    expect(rt.power.is('shield')).toBe(true);
+    expect(rt.shield).toBe(true);
   });
 
   it('is off by default and leaves normal runs untouched', () => {
-    expect(runtime(false).power.kind).toBe(null);
+    expect(runtime(false).shield).toBe(false);
   });
 });
 
@@ -233,7 +211,7 @@ describe('assist and settings inside scenes', () => {
     app.settings.set('assist', true);
     app.scenes.go('Level', { world: 0, index: 0 });
     const sc = app.scenes.current;
-    expect(sc.runtime.power.is('shield')).toBe(true);
+    expect(sc.runtime.shield).toBe(true);
     drive(app, 240, 40);
     expect(sc.runtime.distance / normal).toBeGreaterThan(0.75);
     expect(sc.runtime.distance / normal).toBeLessThan(0.85);
@@ -349,24 +327,20 @@ describe('assist and settings inside scenes', () => {
 });
 
 describe('announcements for screen readers', () => {
-  it('announces the level, checkpoints and pickups', () => {
+  it('announces the level and a broken shield', () => {
     const app = makeApp(1000, 700);
+    app.settings.set('assist', true);
     app.scenes.go('Level', { world: 0, index: 0 });
     expect(app.announced[0]).toBe('Landing Page, Above the Fold. Level 1.');
     const sc = app.scenes.current;
-    sc.runtime.onPower('shield', 0, 0);
-    expect(app.announced).toContain('Shield collected');
-    tuning.debug.invincible = true;
-    sc.runtime.distance = sc.level.checkpoint - 1;
-    sc.runtime.next = sc.level.obstacles.length;
-    drive(app, 4, 1);
-    expect(app.announced).toContain('Checkpoint reached');
+    sc.runtime.onShieldBreak();
+    expect(app.announced).toContain('Shield broken');
   });
 
   it('announces boss attacks and mode switches', () => {
     const app = makeApp(1000, 700);
     tuning.debug.invincible = true;
-    app.scenes.go('Boss', { world: 4 });
+    app.scenes.go('Boss', { world: 3 });
     expect(app.announced[0]).toBe('The Paywall boss fight.');
     drive(app, 120 * 30, 60);
     expect(app.announced.some((t) => t.startsWith('Incoming: '))).toBe(true);

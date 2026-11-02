@@ -10,8 +10,7 @@ function makeSim(level) {
   const player = createPlayer();
   const env = {
     width: () => v.refWidth,
-    groundY: () => v.refGround,
-    terrain: (d) => (level.terrain ? level.terrain.height(d) : 0)
+    groundY: () => v.refGround
   };
   const mode = createMode(level.mode || 'run', player, env);
   return {
@@ -326,25 +325,6 @@ function flipReach(level) {
   return { ok: true, deepest: obs.length - 1, exhausted: false, sims, airDistance: 0 };
 }
 
-function surfKey(s) {
-  const v = tuning.validator;
-  return (
-    Math.round(s.d / 10) +
-    '|' +
-    Math.round(s.lift / 6) +
-    '|' +
-    Math.round(s.vUp / 80) +
-    '|' +
-    (s.riding ? 1 : 0) +
-    '|' +
-    Math.round(s.boost * 40) +
-    '|' +
-    (s.held ? 1 : 0) +
-    '|' +
-    Math.min(3, Math.floor(s.tog / Math.max(1, v.surfMinToggleMs / 2)))
-  );
-}
-
 function clusterize(level, settleMs) {
   const obs = level.obstacles;
   const clusters = [];
@@ -362,96 +342,7 @@ function clusterize(level, settleMs) {
   return clusters;
 }
 
-function surfReach(level) {
-  const v = tuning.validator;
-  const t = tuning.surf;
-  const obs = level.obstacles;
-  const sim = makeSim(level);
-  const mode = sim.mode;
-  const dt = 1 / tuning.sim.hz;
-  const clusters = clusterize(level, v.surfSettleMs);
-  let sims = 0;
-  for (let c = 0; c < clusters.length; c++) {
-    const cl = clusters[c];
-    const first = obs[cl.a];
-    const d0 = Math.max(0, first.x - t.size - (level.speedAt(first.x) * v.surfLeadMs) / 1000);
-    const dEnd = cl.end + t.size + 40;
-    let layer = [];
-    for (const b of [0]) {
-      mode.d = d0;
-      mode.dx = 0;
-      mode.reset();
-      const st = mode.saveState({});
-      st.boost = b;
-      st.d = d0;
-      st.dx = level.speedAt(d0) * dt;
-      st.tog = 1e9;
-      layer.push(st);
-    }
-    let reached = false;
-    while (layer.length > 0 && !reached) {
-      const next = [];
-      const seen = new Set();
-      for (let n = 0; n < layer.length && !reached; n++) {
-        const from = layer[n];
-        for (let act = 0; act < 2; act++) {
-          const wantHeld = act === 1;
-          const toggles = wantHeld !== from.held;
-          if (toggles && from.tog < v.surfMinToggleMs) continue;
-          sims++;
-          mode.loadState(from);
-          mode.dx = from.dx;
-          mode.d = from.d;
-          let tog = from.tog;
-          if (toggles) {
-            if (wantHeld) mode.onPress();
-            else mode.onRelease();
-            tog = 0;
-          }
-          let d2 = from.d;
-          let ok = true;
-          for (let k = 0; k < v.surfSteps; k++) {
-            d2 = stepMode(sim, level, d2, dt);
-            tog += dt * 1000;
-            if (collides(sim, level, d2, cl.a, cl.b, v.surfMargin)) {
-              ok = false;
-              break;
-            }
-            if (d2 >= dEnd) break;
-          }
-          if (!ok) continue;
-          if (d2 >= dEnd) {
-            reached = true;
-            break;
-          }
-          const st = mode.saveState({});
-          st.d = d2;
-          st.dx = mode.dx;
-          st.tog = tog;
-          const key = surfKey(st);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          next.push(st);
-        }
-      }
-      if (reached) break;
-      if (next.length > v.surfBeam) {
-        next.sort((p, q) => p.d - q.d || p.lift - q.lift);
-        const keep = [];
-        const stride = next.length / v.surfBeam;
-        for (let k = 0; k < v.surfBeam; k++) keep.push(next[Math.floor(k * stride)]);
-        layer = keep;
-      } else {
-        layer = next;
-      }
-    }
-    if (!reached) return { ok: false, deepest: cl.a, exhausted: false, sims, airDistance: 0 };
-  }
-  return { ok: true, deepest: obs.length - 1, exhausted: false, sims, airDistance: 0 };
-}
-
 export function validateReachability(level) {
-  if (level.mode === 'surf') return surfReach(level);
   if (level.mode === 'flip') return flipReach(level);
   if (level.mode === 'flap') return flapReach(level);
   const ctx = makeContext(level);
@@ -472,10 +363,6 @@ export function validateLevel(level) {
   if (seconds < v.minSeconds || seconds > v.maxSeconds) {
     errors.push('duration ' + seconds.toFixed(1) + 's outside ' + v.minSeconds + '-' + v.maxSeconds + 's');
   }
-  const ratio = level.checkpoint / level.length;
-  if (level.checkpoint <= 0 || ratio < v.cpMin || ratio > v.cpMax) {
-    errors.push('checkpoint at ' + (ratio * 100).toFixed(0) + '% is not near the midpoint');
-  }
   const size = tuning[level.mode === 'run' || !level.mode ? 'run' : level.mode].size;
   const reactOk = (from) => {
     const first = level.obstacles.find((o) => o.x - size >= from);
@@ -483,7 +370,6 @@ export function validateLevel(level) {
     return ((first.x - size - from) / level.speedAt(from)) * 1000 >= v.minReactMs;
   };
   if (!reactOk(0)) errors.push('first obstacle leaves under ' + v.minReactMs + ' ms to react after the start');
-  if (!reactOk(level.checkpoint)) errors.push('first obstacle after the checkpoint leaves under ' + v.minReactMs + ' ms to react');
 
   let sims = 0;
   if (level.mode && level.mode !== 'run') {
@@ -491,19 +377,10 @@ export function validateLevel(level) {
     sims = r.sims;
     if (!r.ok) errors.push('unreachable near ' + label(level, r.deepest));
   } else {
-    for (const start of [0, level.checkpoint]) {
-      const ctx = makeContext(level);
-      const ok = solve(ctx, 0, start);
-      sims += ctx.sims;
-      if (!ok) {
-        errors.push(
-          (ctx.exhausted ? 'search budget exceeded' : 'unreachable') +
-            ' near ' +
-            label(level, ctx.deepest) +
-            (start > 0 ? ' (from checkpoint)' : '')
-        );
-      }
-    }
+    const ctx = makeContext(level);
+    const ok = solve(ctx, 0, 0);
+    sims += ctx.sims;
+    if (!ok) errors.push((ctx.exhausted ? 'search budget exceeded' : 'unreachable') + ' near ' + label(level, ctx.deepest));
   }
   return { ok: errors.length === 0, errors, seconds, sims };
 }

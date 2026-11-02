@@ -9,12 +9,8 @@ import { createHud } from '../ui/hud.js';
 import { compileLevel } from './compile.js';
 import { LevelRuntime } from './runtime.js';
 import { computeStars } from './scoring.js';
-import { drawBackdrop, drawGround, drawPlayer, drawObstacle, drawToken, drawOrb, drawTerrain, drawPower, drawBullet, drawShield } from './draw.js';
+import { drawBackdrop, drawGround, drawPlayer, drawObstacle, drawToken, drawOrb, drawShield } from './draw.js';
 import { worlds } from './worlds.js';
-
-const POWER_NAMES = { blaster: 'Blaster', shield: 'Shield', magnet: 'Magnet', slowmo: 'Slow-mo' };
-const DASH = [5, 5];
-const NO_DASH = [];
 
 export class LevelScene extends Scene {
   enter(params) {
@@ -28,8 +24,7 @@ export class LevelScene extends Scene {
     this.player = createPlayer();
     this.env = {
       width: () => app.width / this.sc,
-      groundY: () => (app.height * tuning.world.groundRatio) / this.sc,
-      terrain: (d) => (this.level && this.level.terrain ? this.level.terrain.height(d) : 0)
+      groundY: () => (app.height * tuning.world.groundRatio) / this.sc
     };
     this.modeKind = this.world.startMode || this.world.mode;
     this.mode = createMode(this.modeKind, this.player, this.env);
@@ -38,11 +33,6 @@ export class LevelScene extends Scene {
     this.setup();
     const rt = this.runtime;
     rt.onCollect = (it, x, y) => this.collect(it, x, y);
-    rt.onPower = (kind, x, y) => {
-      this.announce(POWER_NAMES[kind] + ' collected');
-      app.audio.play('power');
-      this.particles.burst(x, y, 10, 170, 0.6, 6, 'accent', false, 0);
-    };
     rt.onShieldBreak = () => {
       this.announce('Shield broken');
       const p = this.player;
@@ -50,16 +40,10 @@ export class LevelScene extends Scene {
       this.camera.shake(tuning.fx.deathShake);
       this.particles.burst(p.x + p.size / 2, p.y + p.size / 2, 18, 300, 0.6, 7, 'accent', false, 0);
     };
-    rt.onDestroy = (o, x, y) => {
-      app.audio.play('break');
-      this.particles.burst(x, y, 10, 210, 0.5, 6, 'solid', false, 0);
-    };
-    rt.onFire = () => app.audio.play('shoot');
     this.hud = createHud(this, this.hudConfig());
     this.finished = false;
     this.wasRunning = true;
     this.prevState = 'running';
-    this.cpFx = false;
     this.hitStop = 0;
     app.input.reset();
     this.bind();
@@ -78,8 +62,7 @@ export class LevelScene extends Scene {
     const m = this.world.mode;
     if (m === 'flap') return tuning.flap.fieldH;
     if (m === 'flip') return tuning.flip.fieldH;
-    if (m === 'surf') return tuning.surf.field;
-    if (m === 'mixed') return Math.max(tuning.flap.fieldH, tuning.flip.fieldH, tuning.surf.field, tuning.run.field);
+    if (m === 'mixed') return Math.max(tuning.flap.fieldH, tuning.flip.fieldH, tuning.run.field);
     return tuning.run.field;
   }
 
@@ -94,14 +77,12 @@ export class LevelScene extends Scene {
     this.def = this.world.levels[this.index];
     this.level = compileLevel(this.def, this.world.chunks);
     this.runtime = new LevelRuntime(this.level, this.mode, this.env, { assist: this.assistOn() });
-    this.showCheckpoint = true;
   }
 
   hudConfig() {
     return {
       world: this.world.name,
       title: 'Level ' + (this.index + 1),
-      checkpointPct: (this.level.checkpoint / this.level.length) * 100,
       countLabel: 'Tokens'
     };
   }
@@ -139,7 +120,6 @@ export class LevelScene extends Scene {
   }
 
   collect(it, x, y) {
-    if (it.kind === 'power') return;
     if (it.kind === 'orb') {
       this.app.audio.play('bug');
       this.particles.burst(x, y, 10, 180, 0.6, 7, 'accent', true, 0);
@@ -222,12 +202,6 @@ export class LevelScene extends Scene {
       this.particles.burst(p.x + p.size / 2, this.feet(), 5, 110, 0.4, 4, 'muted', false, -tuning.world.speed * 0.25);
     }
     if (rt.state === 'dead' && this.prevState !== 'dead') this.onDeath();
-    if (this.showCheckpoint && rt.checkpointed && !this.cpFx) {
-      this.cpFx = true;
-      audio.play('checkpoint');
-      this.announce('Checkpoint reached');
-      this.particles.burst(p.x + p.size / 2, p.y, 10, 160, 0.8, 9, 'accent', true, 0);
-    }
     this.prevState = rt.state;
 
     this.afterUpdate(sdt);
@@ -245,7 +219,6 @@ export class LevelScene extends Scene {
     const p = this.player;
     for (let i = 0; i < pool.count; i++) {
       const o = pool.active[i];
-      if (o.destroyed) continue;
       drawObstacle(ctx, o, p.x + o.x - s, gy, this.runtime.time, s);
     }
   }
@@ -262,11 +235,7 @@ export class LevelScene extends Scene {
       if (it.got || sx < -tuning.level.despawnMargin) continue;
       const iy = gy - it.lift;
       if (it.kind === 'orb') drawOrb(ctx, sx, iy, tuning.orb.r, rt.time);
-      else if (it.kind === 'power') drawPower(ctx, sx, iy, it.power, rt.time);
-      else if (it.pull > 0) {
-        const k = it.pull * it.pull;
-        drawToken(ctx, sx + (p.x + p.size / 2 - sx) * k, iy + (p.y + p.size / 2 - iy) * k, tuning.token.r, it.bonus);
-      } else drawToken(ctx, sx, iy, tuning.token.r, it.bonus);
+      else drawToken(ctx, sx, iy, tuning.token.r);
     }
   }
 
@@ -288,23 +257,7 @@ export class LevelScene extends Scene {
     ctx.translate(cam.x, cam.y);
 
     drawBackdrop(ctx, width, gy, s);
-    if (this.modeKind === 'surf' && this.level.terrain) drawTerrain(ctx, width, gy, s, this.level.terrain, p.x);
-    else drawGround(ctx, width, gy, s, this.modeKind);
-
-    if (this.showCheckpoint) {
-      const cx = p.x + this.level.checkpoint - s;
-      if (cx > -4 && cx < width + 4) {
-        ctx.save();
-        ctx.setLineDash(DASH);
-        ctx.strokeStyle = colors.accent;
-        ctx.beginPath();
-        ctx.moveTo(cx + 0.5, gy - 120);
-        ctx.lineTo(cx + 0.5, gy);
-        ctx.stroke();
-        ctx.setLineDash(NO_DASH);
-        ctx.restore();
-      }
-    }
+    drawGround(ctx, width, gy, s, this.modeKind);
 
     this.drawObstacles(ctx, s, gy);
     this.drawItems(ctx, s, gy);
@@ -313,27 +266,8 @@ export class LevelScene extends Scene {
     const y = p.prevY + (p.y - p.prevY) * alpha;
     if (rt.state !== 'dead') {
       drawPlayer(ctx, p.x, y, p.size, 1, this.mode.tilt ? this.mode.tilt() : 0);
-      if (rt.power.is('shield')) drawShield(ctx, p.x, y, p.size, 1);
+      if (rt.shield) drawShield(ctx, p.x, y, p.size, 1);
       else if (rt.iframes > 0) drawShield(ctx, p.x, y, p.size, motion.reduced || Math.floor(rt.time * 24) % 2 ? 0.5 : 0.15);
-      if (rt.power.is('magnet')) {
-        ctx.save();
-        ctx.globalAlpha = 0.2;
-        ctx.strokeStyle = colors.accent;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(p.x + p.size / 2, y + p.size / 2, tuning.magnet.radius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-    const bullets = rt.bullets;
-    for (let i = 0; i < bullets.count; i++) drawBullet(ctx, bullets.active[i].x, bullets.active[i].y);
-    if (rt.power.is('slowmo')) {
-      ctx.save();
-      ctx.globalAlpha = 0.06;
-      ctx.fillStyle = colors.accent;
-      ctx.fillRect(-60, -60, width + 120, 4000);
-      ctx.restore();
     }
     this.particles.render(ctx);
 

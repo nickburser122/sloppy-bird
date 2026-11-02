@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SaveStore, SAVE_KEY, SAVE_VERSION, DEFAULT_SETTINGS } from '../src/save.js';
 import { computeStars } from '../src/levels/scoring.js';
-import { world1 } from '../src/levels/world1.js';
 
 function memory(initial) {
   const map = new Map();
@@ -74,15 +73,14 @@ describe('SaveStore', () => {
 
   it('unlocks a level only after finishing the previous one', () => {
     const save = new SaveStore(memory());
-    const order = world1.order;
+    const order = ['w1l1', 'w1l2', 'w2l1'];
     expect(save.isUnlocked(order, 'w1l1')).toBe(true);
     expect(save.isUnlocked(order, 'w1l2')).toBe(false);
     save.record('w1l1', { stars: 1, time: 60, retries: 9 });
     expect(save.isUnlocked(order, 'w1l2')).toBe(true);
-    expect(save.isUnlocked(order, 'w1boss')).toBe(false);
+    expect(save.isUnlocked(order, 'w2l1')).toBe(false);
     save.record('w1l2', { stars: 1, time: 60, retries: 9 });
-    save.record('w1l3', { stars: 1, time: 60, retries: 9 });
-    expect(save.isUnlocked(order, 'w1boss')).toBe(true);
+    expect(save.isUnlocked(order, 'w2l1')).toBe(true);
   });
 
   it('reset clears progress', () => {
