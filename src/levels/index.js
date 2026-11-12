@@ -1,0 +1,23 @@
+import { checkLevel } from './schema.js';
+import l1 from './data/w1-l1.js';
+import l2 from './data/w1-l2.js';
+import l3 from './data/w1-l3.js';
+import l4 from './data/w1-l4.js';
+import g1 from './data/w2-l1.js';
+import g2 from './data/w2-l2.js';
+import g3 from './data/w2-l3.js';
+import g4 from './data/w2-l4.js';
+import s1 from './data/w3-l1.js';
+import s2 from './data/w3-l2.js';
+import s3 from './data/w3-l3.js';
+import s4 from './data/w3-l4.js';
+import m1 from './data/w5-l1.js';
+import m2 from './data/w5-l2.js';
+import mb from './data/w5-boss.js';
+import f1 from './data/w4-l1.js';
+import f2 from './data/w4-l2.js';
+import f3 from './data/w4-l3.js';
+import f4 from './data/w4-l4.js';
+
+export const levels = [l1, l2, l3, l4, g1, g2, g3, g4, s1, s2, s3, s4, f1, f2, f3, f4, m1, m2, mb].map(checkLevel);
+export const byId = (id) => levels.find((l) => l.id === id);

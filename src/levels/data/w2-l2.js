@@ -1,0 +1,33 @@
+export default {
+  id: 'w2-l2',
+  world: 2,
+  name: 'Silk Road',
+  mode: 'flap',
+  bpm: 120,
+  speed: 300,
+  beats: 40,
+  wall: false,
+  dark: [],
+  shard: { beat: 36, y: 441 },
+  events: [
+    { beat: 1.5, type: 'thorn', gy: 360, gap: 180, w: 60 },
+    { beat: 3, type: 'mgap', gy: 220, gap: 210, amp: 100, period: 6, w: 60, phase: 0 },
+    { beat: 5.5, type: 'thorn', gy: 270, gap: 180, w: 60 },
+    { beat: 7.5, type: 'spider', len: 300 },
+    { beat: 9.75, type: 'mgap', gy: 300, gap: 180, amp: 40, period: 6, w: 60, phase: 0 },
+    { beat: 12.5, type: 'thorn', gy: 320, gap: 160, w: 60 },
+    { beat: 14.75, type: 'spider', len: 280 },
+    { beat: 16.5, type: 'spider', len: 260 },
+    { beat: 17.75, type: 'spider', len: 300 },
+    { beat: 19.5, type: 'spider', len: 240 },
+    { beat: 22, type: 'thorn', gy: 130, gap: 150, w: 60 },
+    { beat: 23, type: 'thorn', gy: 130, gap: 160, w: 60 },
+    { beat: 25.25, type: 'thorn', gy: 130, gap: 150, w: 60 },
+    { beat: 27, type: 'thorn', gy: 130, gap: 140, w: 60 },
+    { beat: 28.5, type: 'thorn', gy: 230, gap: 140, w: 60 },
+    { beat: 30.5, type: 'thorn', gy: 370, gap: 140, w: 60 },
+    { beat: 32.5, type: 'mgap', gy: 260, gap: 160, amp: 60, period: 4, w: 60, phase: 0 },
+    { beat: 34.25, type: 'spider', len: 240 },
+    { beat: 37.25, type: 'thorn', gy: 390, gap: 140, w: 60 }
+  ]
+};

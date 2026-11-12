@@ -1,19 +1,16 @@
 {
-  "name": "Above the Fold",
-  "short_name": "Above the Fold",
-  "description": "A one-button runner through the web's most avoidable interface decisions.",
-  "id": "./",
+  "name": "NERVE",
+  "short_name": "NERVE",
+  "description": "Four modes. Four characters. One button.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#f7f8fa",
-  "theme_color": "#f7f8fa",
-  "categories": ["games"],
+  "orientation": "landscape",
+  "background_color": "#10131c",
+  "theme_color": "#10131c",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
-    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

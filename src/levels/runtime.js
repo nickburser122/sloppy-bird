@@ -1,174 +1,261 @@
 import { tuning } from '../config/tuning.js';
-import { Pool } from '../engine/pool.js';
-import { circleAabb } from '../engine/collision.js';
-import { obstacleHits } from '../entities/obstacles/types.js';
 
-export class LevelRuntime {
-  constructor(level, mode, env, opts) {
-    this.assist = !!(opts && opts.assist);
-    this.level = level;
-    this.mode = mode;
-    this.env = env;
-    this.pool = new Pool(tuning.level.poolSize, () => ({
-      type: '',
-      kind: '',
-      shape: 'rect',
-      edge: 'floor',
-      x: 0,
-      w: 0,
-      h: 0,
-      lift: 0,
-      bobAmp: 0,
-      bobPeriod: 1,
-      bobPhase: 0,
-      bobRel: false,
-      hit: { x: 0, y: 0, w: 0, h: 0 }
-    }));
-    this.shield = false;
-    this.iframes = 0;
-    this.onShieldBreak = null;
-    this.onRestart = null;
-    this.circle = { x: 0, y: 0, r: 0 };
-    this.ocircle = { x: 0, y: 0, r: 0 };
-    this.obox = { x: 0, y: 0, w: 0, h: 0 };
-    this.distance = 0;
-    this.prevDistance = 0;
-    this.state = 'running';
-    this.deathTimer = 0;
-    this.deaths = 0;
-    this.cheated = false;
-    this.next = 0;
-    this.itemLo = 0;
-    this.collected = 0;
-    this.restartCount = 0;
-    this.time = 0;
-    this.onCollect = null;
-    this.hitHb = null;
-    this.hitPx = 0;
-    this.hitGy = 0;
-    this.hitFlag = false;
-    this.visit = this.visit.bind(this);
-    this.restart();
+const R = tuning.run;
+const W = tuning.stage.w;
+
+const OWNER = {};
+for (const t of ['pit', 'ceil', 'saw', 'log', 'crumble', 'mover', 'pad', 'ring']) OWNER[t] = 'run';
+for (const t of ['gap', 'laser', 'crusher', 'orb', 'force']) OWNER[t] = 'flip';
+for (const t of ['thorn', 'mgap', 'spider', 'plant', 'wind']) OWNER[t] = 'flap';
+for (const t of ['rock', 'buoy', 'beam', 'shark', 'reef', 'whirl', 'ramp']) OWNER[t] = 'surf';
+
+export const modeOfEvent = (e) => OWNER[e.type] || e.m || 'run';
+
+export function segmentAt(segs, beat) {
+  let i = 0;
+  for (let k = 0; k < segs.length; k++) if (segs[k].beat <= beat) i = k;
+  return i;
+}
+
+function compileMix(level) {
+  const beatSec = 60 / level.bpm;
+  const scale = level.scale || 1;
+  const speeds = tuning.mix.speeds;
+  const ports = level.events.filter((e) => e.type === 'portal').sort((a, b) => a.beat - b.beat);
+  const segs = [{ mode: level.start, beat: 0, tb: 0, speed: speeds[level.start] * scale }];
+  for (const p of ports) segs.push({ mode: p.mode, beat: p.beat, tb: p.beat * beatSec, speed: speeds[p.mode] * scale });
+  const base = segs[0].speed;
+  const speedEvents = segs.slice(1).map((s) => ({ beat: s.beat, type: 'speed', mul: s.speed / base }));
+  const subs = {};
+  for (const sg of segs) {
+    if (subs[sg.mode]) continue;
+    const events = level.events.filter((e) => e.type !== 'portal' && modeOfEvent(e) === sg.mode);
+    const own = level.shard && segs[segmentAt(segs, level.shard.beat)].mode === sg.mode ? level.shard : undefined;
+    subs[sg.mode] = compile({ ...level, mode: sg.mode, speed: base, shard: own, events: [...events, ...speedEvents] });
   }
+  const first = subs[segs[0].mode];
+  const reactables = Object.values(subs).flatMap((s) => s.reactables).sort((a, b) => a.tb - b.tb);
+  const mixPortals = segs.slice(1).map((s) => ({ mode: s.mode, tb: s.tb, ox: first.X(s.tb) }));
+  const shard = level.shard ? { ox: first.X(level.shard.beat * beatSec), y: level.shard.y } : null;
+  return { id: level.id, level, shard, beatSec, duration: level.beats * beatSec, segs, X: first.X, T: first.T, subs, reactables, mixPortals };
+}
 
-  restart() {
-    this.distance = 0;
-    this.prevDistance = 0;
-    if (this.onRestart) this.onRestart();
-    this.mode.d = 0;
-    this.mode.dx = 0;
-    this.mode.reset();
-    this.pool.releaseAll();
-    this.next = 0;
-    const items = this.level.items;
-    for (let k = 0; k < items.length; k++) items[k].got = false;
-    this.collected = 0;
-    this.itemLo = 0;
-    this.shield = this.assist;
-    this.iframes = 0;
-    this.state = 'running';
-    this.restartCount++;
-    this.spawn();
+export function compile(level) {
+  if (level.mode === 'mix') return compileMix(level);
+  const beatSec = 60 / level.bpm;
+  const ports = level.events.filter((e) => e.type === 'speed').sort((a, b) => a.beat - b.beat);
+  const segs = [{ t: 0, x: 0, v: level.speed }];
+  for (const p of ports) {
+    const t = p.beat * beatSec;
+    const s = segs[segs.length - 1];
+    segs.push({ t, x: s.x + s.v * (t - s.t), v: level.speed * p.mul });
   }
-
-  spawn() {
-    const obs = this.level.obstacles;
-    const ahead = this.env.width() + tuning.level.spawnMargin;
-    while (this.next < obs.length && obs[this.next].x - this.distance < ahead) {
-      const e = this.pool.acquire();
-      if (!e) break;
-      const o = obs[this.next++];
-      e.type = o.type;
-      e.kind = o.kind;
-      e.shape = o.shape;
-      e.edge = o.edge;
-      e.x = o.x;
-      e.w = o.w;
-      e.h = o.h;
-      e.lift = o.lift;
-      e.bobAmp = o.bobAmp;
-      e.bobPeriod = o.bobPeriod;
-      e.bobPhase = o.bobPhase;
-      e.bobRel = o.bobRel;
+  const X = (t) => {
+    let i = segs.length - 1;
+    while (i > 0 && segs[i].t > t) i--;
+    const s = segs[i];
+    return s.x + s.v * (t - s.t);
+  };
+  const T = (x) => {
+    if (x <= 0) return 0;
+    let i = segs.length - 1;
+    while (i > 0 && segs[i].x > x) i--;
+    const s = segs[i];
+    return s.t + (x - s.x) / s.v;
+  };
+  const c = {
+    id: level.id,
+    level,
+    shard: null,
+    beatSec,
+    duration: level.beats * beatSec,
+    segs,
+    X,
+    T,
+    spikes: [],
+    pits: [],
+    ceils: [],
+    saws: [],
+    logs: [],
+    plats: [],
+    pads: [],
+    rings: [],
+    portals: [],
+    gaps: [],
+    lasers: [],
+    crushers: [],
+    orbs: [],
+    forces: [],
+    thorns: [],
+    spiders: [],
+    plants: [],
+    winds: [],
+    rocks: [],
+    buoys: [],
+    beams: [],
+    sharks: [],
+    reefs: [],
+    whirls: [],
+    ramps: [],
+    waves: level.waves || [],
+    dark: (level.dark || []).map(([a, b]) => [a * beatSec, b * beatSec]),
+    reactables: []
+  };
+  for (const e of level.events) {
+    const tb = e.beat * beatSec;
+    const ox = X(tb);
+    const vis = T(ox + R.px - W);
+    const o = { kind: e.type, ox, tb, vis };
+    switch (e.type) {
+      case 'spike':
+        o.n = e.n || 1;
+        o.side = e.side || 0;
+        o.w = R.spikeW * o.n;
+        c.spikes.push(o);
+        break;
+      case 'pit':
+        o.w = e.w;
+        c.pits.push(o);
+        break;
+      case 'ceil':
+        o.w = e.w;
+        o.h = e.h;
+        c.ceils.push(o);
+        break;
+      case 'saw':
+        o.r = e.r || R.sawR;
+        o.cy = R.ground - e.y;
+        o.cy2 = R.ground - e.y2;
+        o.period = e.period * beatSec;
+        c.saws.push(o);
+        break;
+      case 'log':
+        o.w = R.logW;
+        o.h = R.logH;
+        o.tFall = tb - R.logLead - R.logFall;
+        o.tLand = tb - R.logLead;
+        o.vis = Math.max(0, Math.min(vis, o.tFall));
+        c.logs.push(o);
+        break;
+      case 'crumble':
+      case 'mover':
+        o.w = e.w;
+        o.top0 = R.ground - e.y;
+        o.amp = e.amp || 0;
+        o.period = (e.period || 4) * beatSec;
+        o.phase = e.phase || 0;
+        o.id = c.plats.length;
+        c.plats.push(o);
+        break;
+      case 'pad':
+        o.w = R.padW;
+        c.pads.push(o);
+        break;
+      case 'ring':
+        o.cy = R.ground - e.y;
+        o.id = c.rings.length;
+        c.rings.push(o);
+        break;
+      case 'gap':
+        o.side = e.side;
+        o.w = e.w;
+        c.gaps.push(o);
+        break;
+      case 'laser':
+        o.side = e.side;
+        o.w = tuning.flip.laserW;
+        c.lasers.push(o);
+        break;
+      case 'crusher':
+        o.side = e.side;
+        o.w = e.w;
+        o.depth = e.depth || tuning.flip.crushDepth;
+        o.period = (e.period || 2) * beatSec;
+        c.crushers.push(o);
+        break;
+      case 'orb':
+        o.cy = e.y === undefined ? 270 : e.y;
+        o.id = c.orbs.length;
+        c.orbs.push(o);
+        break;
+      case 'force':
+        c.forces.push(o);
+        break;
+      case 'thorn':
+      case 'mgap':
+        o.w = e.w || 60;
+        o.gy = e.gy;
+        o.gap = e.gap;
+        o.amp = e.amp || 0;
+        o.period = (e.period || 4) * beatSec;
+        o.phase = e.phase || 0;
+        c.thorns.push(o);
+        break;
+      case 'spider':
+        o.len = e.len;
+        o.period = 2 * beatSec;
+        o.w = 30;
+        c.spiders.push(o);
+        break;
+      case 'plant':
+        o.w = e.w || 90;
+        o.depth = tuning.flap.plantDepth;
+        o.period = 2 * beatSec;
+        c.plants.push(o);
+        break;
+      case 'wind':
+        o.w = e.w;
+        o.dir = e.dir;
+        c.winds.push(o);
+        break;
+      case 'rock':
+        o.w = e.w;
+        o.top = e.top;
+        o.bot = e.bot;
+        c.rocks.push(o);
+        break;
+      case 'buoy':
+        o.w = 30;
+        o.chain = e.chain || 90;
+        c.buoys.push(o);
+        break;
+      case 'beam':
+        o.w = e.w;
+        o.bottom = e.bottom;
+        c.beams.push(o);
+        break;
+      case 'shark':
+        o.w = 80;
+        o.y0 = e.y;
+        o.amp = e.amp || 0;
+        o.period = (e.period || 4) * beatSec;
+        c.sharks.push(o);
+        break;
+      case 'reef':
+        o.w = e.w || 70;
+        o.gy = e.gy;
+        o.gap = e.gap;
+        c.reefs.push(o);
+        break;
+      case 'whirl':
+        o.w = e.w;
+        c.whirls.push(o);
+        break;
+      case 'ramp':
+        o.len = e.len;
+        o.h = e.h;
+        o.w = e.len + 30;
+        c.ramps.push(o);
+        break;
+      case 'speed':
+        o.mul = e.mul;
+        c.portals.push(o);
+        break;
     }
+    o.te = o.w ? T(ox + o.w) : tb;
+    if (e.type !== 'pad' && e.type !== 'speed' && e.type !== 'force' && e.type !== 'whirl' && e.type !== 'ramp') c.reactables.push(o);
   }
-
-  visit(o) {
-    const sx = this.hitPx + o.x - this.distance;
-    if (sx + o.w < -tuning.level.despawnMargin) return false;
-    const hit = obstacleHits(this.hitHb, o, sx, this.hitGy, this.distance, this.obox, this.ocircle);
-    o.hit.x = this.obox.x;
-    o.hit.y = this.obox.y;
-    o.hit.w = this.obox.w;
-    o.hit.h = this.obox.h;
-    if (hit) this.hitFlag = true;
-    return true;
-  }
-
-  collectItems() {
-    const items = this.level.items;
-    const reach = this.env.width() + tuning.level.spawnMargin;
-    const margin = tuning.level.despawnMargin;
-    const hb = this.hitHb;
-    for (let i = this.itemLo; i < items.length; i++) {
-      const it = items[i];
-      const sx = this.hitPx + it.x - this.distance;
-      if (sx < -margin) {
-        if (i === this.itemLo) this.itemLo++;
-        continue;
-      }
-      if (sx > reach) break;
-      if (it.got) continue;
-      const c = this.circle;
-      c.x = sx;
-      c.y = this.hitGy - it.lift;
-      c.r = it.kind === 'orb' ? tuning.orb.r : tuning.token.r;
-      if (circleAabb(c, hb)) this.take(it, c.x, c.y);
-    }
-  }
-
-  take(it, x, y) {
-    it.got = true;
-    if (it.kind === 'token') this.collected++;
-    if (this.onCollect) this.onCollect(it, x, y);
-  }
-
-  update(dt) {
-    this.time += dt;
-    if (this.state === 'dead') {
-      this.deathTimer -= dt * 1000;
-      if (this.deathTimer <= 0) this.restart();
-      return;
-    }
-    if (this.state === 'won') return;
-    if (tuning.debug.invincible) this.cheated = true;
-    this.prevDistance = this.distance;
-    if (this.iframes > 0) this.iframes -= dt * 1000;
-    const mul = this.mode.speedMul ? this.mode.speedMul() : 1;
-    const step = this.level.speedAt(this.distance) * mul * dt;
-    this.mode.d = this.distance + step;
-    this.mode.dx = step;
-    this.mode.update(dt);
-    this.distance += step;
-    this.spawn();
-    this.hitHb = this.mode.getHitbox();
-    this.hitPx = this.mode.player.x;
-    this.hitGy = this.env.groundY();
-    this.hitFlag = false;
-    this.pool.update(this.visit);
-    if (this.hitFlag && !tuning.debug.invincible && this.iframes <= 0) {
-      if (this.shield) {
-        this.shield = false;
-        this.iframes = tuning.shield.iframeMs;
-        if (this.onShieldBreak) this.onShieldBreak();
-      } else {
-        this.state = 'dead';
-        this.deaths++;
-        this.deathTimer = tuning.level.retryMs;
-        return;
-      }
-    }
-    this.collectItems();
-    if (this.distance >= this.level.length) this.state = 'won';
-  }
+  c.reactables.sort((a, b) => a.tb - b.tb);
+  if (level.shard) c.shard = { ox: X(level.shard.beat * beatSec), y: level.shard.y };
+  return c;
 }

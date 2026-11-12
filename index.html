@@ -3,23 +3,68 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#f7f8fa">
-<meta name="description" content="A one-button runner through the web's most avoidable interface decisions.">
+<meta name="theme-color" content="#10131c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Above the Fold">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Above the Fold</title>
-<style>html{background:#f7f8fa}</style>
+<title>NERVE</title>
+<style>
+html,body{margin:0;height:100%;background:#0b0d12;overflow:hidden;touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+body{display:flex;align-items:center;justify-content:center}
+#stage{position:relative}
+#game{display:block;width:100%;height:100%}
+#overlay{position:absolute;inset:0;pointer-events:none}
+#overlay [data-ui]{pointer-events:auto}
+#rotate{position:fixed;left:0;right:0;bottom:12px;text-align:center;font:600 13px 'JetBrains Mono Variable',monospace;color:#8b93a7;display:none;pointer-events:none}
+#rotate.on{display:block}
+
+.ui{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e8ecf5;font-family:'JetBrains Mono Variable',monospace;text-align:center;font-size:calc(var(--u,1)*16px)}
+.ui h1{font-size:calc(var(--u,1)*72px);letter-spacing:.22em;margin:0 0 calc(var(--u,1)*6px);text-indent:.22em}
+.ui h2{font-size:calc(var(--u,1)*34px);margin:0 0 calc(var(--u,1)*10px)}
+.ui p{margin:calc(var(--u,1)*6px) 0}
+.sub{opacity:.7}
+.col{display:flex;flex-direction:column;gap:calc(var(--u,1)*12px);margin-top:calc(var(--u,1)*24px)}
+.row{display:flex;gap:calc(var(--u,1)*12px);justify-content:center;flex-wrap:wrap;margin-top:calc(var(--u,1)*16px)}
+.btn{font:inherit;font-weight:700;color:#10131c;background:#ff7a3d;border:0;border-radius:calc(var(--u,1)*10px);padding:calc(var(--u,1)*12px) calc(var(--u,1)*28px);cursor:pointer;min-width:calc(var(--u,1)*190px)}
+.btn:hover,.btn:focus-visible{background:#ffa26b;outline:calc(var(--u,1)*3px) solid #fff}
+.btn.ghost{background:transparent;color:#e8ecf5;border:calc(var(--u,1)*2px) solid #5c6781}
+.btn.small{min-width:0;padding:calc(var(--u,1)*6px) calc(var(--u,1)*12px);font-size:calc(var(--u,1)*13px)}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+.panel{background:rgba(16,19,28,.92);border:calc(var(--u,1)*2px) solid #2c3550;border-radius:calc(var(--u,1)*16px);padding:calc(var(--u,1)*24px) calc(var(--u,1)*32px);min-width:calc(var(--u,1)*420px)}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:calc(var(--u,1)*20px);margin:calc(var(--u,1)*10px) 0;text-align:left}
+.setrow small{display:block;opacity:.6;font-size:calc(var(--u,1)*11px)}
+.setrow input[type=range]{width:calc(var(--u,1)*160px)}
+.map{justify-content:flex-start;padding:calc(var(--u,1)*14px) calc(var(--u,1)*16px)}
+.maphead{display:flex;width:100%;justify-content:space-between;align-items:center;margin-bottom:calc(var(--u,1)*10px)}
+.maphead h2{margin:0;font-size:calc(var(--u,1)*24px)}
+.worlds{display:grid;grid-template-columns:repeat(5,1fr);gap:calc(var(--u,1)*10px);width:100%;flex:1}
+.world{background:#141a2b;border:calc(var(--u,1)*2px) solid #2c3550;border-radius:calc(var(--u,1)*12px);padding:calc(var(--u,1)*10px);display:flex;flex-direction:column;gap:calc(var(--u,1)*6px);text-align:left}
+.world.locked{opacity:.45}
+.world h3{margin:0;font-size:calc(var(--u,1)*14px)}
+.world .who{font-size:calc(var(--u,1)*11px);opacity:.7;margin-bottom:calc(var(--u,1)*4px)}
+.node{font:inherit;font-size:calc(var(--u,1)*11px);text-align:left;color:#e8ecf5;background:#1d2540;border:calc(var(--u,1)*1px) solid #34406a;border-radius:calc(var(--u,1)*8px);padding:calc(var(--u,1)*6px) calc(var(--u,1)*8px);cursor:pointer;display:flex;flex-direction:column;gap:calc(var(--u,1)*2px)}
+.node:hover,.node:focus-visible{border-color:#ff7a3d;outline:none}
+.node[disabled]{cursor:not-allowed;opacity:.5}
+.node b{font-size:calc(var(--u,1)*11px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node .meta{opacity:.75;display:flex;justify-content:space-between}
+.m-on{color:#ffd24a}.m-slow{color:#6ec3ff}.m-off{opacity:.3}
+.hudbtns{position:absolute;top:calc(var(--u,1)*14px);right:calc(var(--u,1)*14px);display:flex;gap:calc(var(--u,1)*8px)}
+.layer{position:absolute;inset:0}
+@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+.panel{animation:pop .18s ease-out}
+@media (prefers-reduced-motion:reduce){.panel{animation:none}}
+body.reduced .panel{animation:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
 </head>
 <body>
 <div id="stage">
   <canvas id="game"></canvas>
   <div id="overlay"></div>
 </div>
+<div id="rotate">rotate for best experience</div>
 <div id="live" class="sr-only" role="status" aria-live="polite"></div>
 <script type="module" src="/src/main.js"></script>
 </body>

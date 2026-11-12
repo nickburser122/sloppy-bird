@@ -31,7 +31,7 @@ export function serviceWorkerSource(list) {
     "const VERSION = '" +
     version +
     "';\n" +
-    "const CACHE = 'atf-' + VERSION;\n" +
+    "const CACHE = 'nerve-' + VERSION;\n" +
     'const PRECACHE = ' +
     JSON.stringify(list) +
     ';\n' +
@@ -42,7 +42,7 @@ export function serviceWorkerSource(list) {
     '  event.waitUntil(\n' +
     '    caches\n' +
     '      .keys()\n' +
-    "      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('atf-') && k !== CACHE).map((k) => caches.delete(k))))\n" +
+    "      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('nerve-') && k !== CACHE).map((k) => caches.delete(k))))\n" +
     '      .then(() => self.clients.claim())\n' +
     '  );\n' +
     '});\n' +
@@ -75,7 +75,7 @@ export function serviceWorkerSource(list) {
 export function pwaPlugin() {
   let outDir = 'dist';
   return {
-    name: 'atf-pwa',
+    name: 'nerve-pwa',
     apply: 'build',
     enforce: 'post',
     configResolved(config) {

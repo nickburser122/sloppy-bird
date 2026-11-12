@@ -1,386 +1,87 @@
+import { compile, modeOfEvent, segmentAt } from './runtime.js';
 import { tuning } from '../config/tuning.js';
-import { createMode } from '../modes/index.js';
-import { createPlayer } from '../entities/player.js';
-import { obstacleHits } from '../entities/obstacles/types.js';
+import { search, centered, runEvents, DT, reach } from '../../playtest/bot.js';
+import { idleBot } from '../../playtest/idle-bot.js';
+import { spamSweep } from '../../playtest/spam-bot.js';
+import { jitterBot } from '../../playtest/jitter-bot.js';
 
-const NEVER = 1e9;
+export const GATES = {
+  1: { window: 90, reaction: 380, ips: [1.3, 2.5], gap: 1.2, jitter: [0.15, 0.8] },
+  2: { window: 70, reaction: 330, ips: [1.8, 3], gap: 1.0, jitter: [0.05, 0.6] },
+  3: { window: 70, reaction: 330, ips: [1.8, 3], gap: 1.0, jitter: [0.05, 0.6] },
+  4: { window: 55, reaction: 280, ips: [2, 3.5], gap: 0.9, jitter: [0.05, 0.6] },
+  5: { window: 55, reaction: 280, ips: [2, 3.5], gap: 0.9, jitter: [0.05, 0.6] }
+};
 
-function makeSim(level) {
-  const v = tuning.validator;
-  const player = createPlayer();
-  const env = {
-    width: () => v.refWidth,
-    groundY: () => v.refGround
-  };
-  const mode = createMode(level.mode || 'run', player, env);
-  return {
-    player,
-    env,
-    mode,
-    box: { x: 0, y: 0, w: 0, h: 0 },
-    circle: { x: 0, y: 0, r: 0 },
-    probe: { x: 0, y: 0, w: 0, h: 0 }
-  };
-}
-
-function collides(sim, level, d, from, to, margin) {
-  const hb = sim.mode.getHitbox();
-  let box = hb;
-  if (margin) {
-    box = sim.probe;
-    box.x = hb.x - margin;
-    box.y = hb.y - margin;
-    box.w = hb.w + margin * 2;
-    box.h = hb.h + margin * 2;
-  }
-  const px = sim.player.x;
-  const obs = level.obstacles;
-  const limit = Math.min(obs.length, to);
-  for (let i = from; i < limit; i++) {
-    const o = obs[i];
-    const sx = px + o.x - d;
-    if (sx > px + sim.player.size * 2) {
-      if (!margin) break;
-      continue;
-    }
-    if (sx + o.w < px - 10) continue;
-    if (obstacleHits(box, o, sx, sim.env.groundY(), d, sim.box, sim.circle)) return true;
-  }
-  return false;
-}
-
-function stepMode(sim, level, d, dt) {
-  const mul = sim.mode.speedMul ? sim.mode.speedMul() : 1;
-  const step = level.speedAt(d) * mul * dt;
-  sim.mode.d = d + step;
-  sim.mode.dx = step;
-  sim.mode.update(dt);
-  return d + step;
-}
-
-function run(sim, level, d0, from, pressAt, holdMs) {
-  sim.mode.reset();
-  const dt = 1 / tuning.sim.hz;
-  const limit = Math.ceil(10 / dt);
-  let d = d0;
-  let t = 0;
-  let pressedAt = -1;
-  let released = false;
-  for (let n = 0; n < limit; n++) {
-    if (pressedAt < 0 && d >= pressAt) {
-      sim.mode.onPress();
-      pressedAt = t;
-    }
-    if (pressedAt >= 0 && !released && (t - pressedAt) * 1000 >= holdMs) {
-      sim.mode.onRelease();
-      released = true;
-    }
-    d = stepMode(sim, level, d, dt);
-    t += dt;
-    if (collides(sim, level, d, from, Infinity, 0)) return -1;
-    if (pressedAt >= 0 && sim.mode.grounded) return d;
-    if (d >= level.length) return d;
-  }
-  return -1;
-}
-
-function advance(level, i, d) {
-  const obs = level.obstacles;
-  while (i < obs.length && obs[i].x + obs[i].w <= d) i++;
-  return i;
-}
-
-function robust(ctx, d, i, pressAt, hold) {
-  const half = (ctx.level.speedAt(d) * tuning.validator.minWindowMs) / 2000;
-  const early = Math.max(d, pressAt - half);
-  if (run(ctx.sim, ctx.level, d, i, early, hold) < 0) return false;
-  return run(ctx.sim, ctx.level, d, i, pressAt + half, hold) >= 0;
-}
-
-function solve(ctx, from, d) {
-  const i = advance(ctx.level, from, d);
-  if (i >= ctx.level.obstacles.length) return true;
-  if (i > ctx.deepest) ctx.deepest = i;
-  const key = i + ':' + Math.round(d / 4);
-  if (ctx.failed.has(key)) return false;
-  const v = tuning.validator;
-  const contact = ctx.level.obstacles[i].x - ctx.size;
-  for (let h = 0; h < ctx.holds.length; h++) {
-    const hold = ctx.holds[h];
-    for (let lead = ctx.maxLead; lead >= 0; lead -= v.leadStepPx) {
-      const pressAt = contact - lead;
-      if (pressAt < d) continue;
-      if (ctx.sims++ > v.maxSims) {
-        ctx.exhausted = true;
-        return false;
-      }
-      const land = run(ctx.sim, ctx.level, d, i, pressAt, hold);
-      if (land < 0) continue;
-      if (!robust(ctx, d, i, pressAt, hold)) continue;
-      if (solve(ctx, i, land)) return true;
-      if (ctx.exhausted) return false;
+export function validate(level, opts = {}) {
+  const gate = GATES[level.world];
+  const c = compile(level);
+  const fail = [];
+  const m = { duration: c.duration };
+  if (c.duration < 15 || c.duration > 30) fail.push(`length ${c.duration.toFixed(1)}s`);
+  if (level.mode === 'mix') {
+    const lane = tuning.mix.safeLaneMs / 1000 / c.beatSec;
+    for (const e of level.events) {
+      if (e.type === 'portal') continue;
+      const sg = c.segs[segmentAt(c.segs, e.beat)];
+      if (modeOfEvent(e) !== sg.mode) fail.push(`${e.type}@${e.beat} outside its mode segment`);
+      for (const p of c.segs.slice(1)) if (e.beat >= p.beat - 0.05 && e.beat < p.beat + lane) fail.push(`${e.type}@${e.beat} inside a safe lane`);
     }
   }
-  ctx.failed.add(key);
-  return false;
-}
-
-function makeContext(level) {
-  const sim = makeSim(level);
-  const probe = { obstacles: [], length: Infinity, speedAt: level.speedAt, mode: 'run' };
-  const airDistance = run(sim, probe, 0, 0, 0, NEVER);
-  const apexMs = (tuning.run.jumpVelocity / tuning.run.gravity) * 1000;
-  const holds = [];
-  for (let h = 0; h <= apexMs; h += tuning.validator.holdStepMs) holds.push(h);
-  holds.push(NEVER);
-  return {
-    level,
-    sim,
-    size: tuning.run.size,
-    maxLead: Math.ceil(airDistance),
-    holds,
-    failed: new Set(),
-    sims: 0,
-    deepest: 0,
-    exhausted: false
-  };
-}
-
-function flapKey(s) {
-  const t = tuning.flap;
-  return (
-    Math.round(s.y / 6) +
-    '|' +
-    Math.round(s.vy / 60) +
-    '|' +
-    (s.held ? 1 : 0) +
-    '|' +
-    Math.min(3, Math.floor(s.heldMs / Math.max(1, t.glideDelayMs / 2))) +
-    '|' +
-    Math.round(s.glideLeft / 150) +
-    '|' +
-    Math.min(3, Math.floor(s.tap / Math.max(1, tuning.validator.flapMinTapMs / 2)))
-  );
-}
-
-function flapReach(level) {
-  const v = tuning.validator;
-  const t = tuning.flap;
-  const obs = level.obstacles;
-  const sim = makeSim(level);
-  const mode = sim.mode;
-  const dt = 1 / tuning.sim.hz;
-  const floorY = sim.env.groundY() - t.size;
-  const ceilY = sim.env.groundY() - t.fieldH;
-  const clusters = [];
-  let i = 0;
-  while (i < obs.length) {
-    let j = i;
-    let end = obs[i].x + obs[i].w;
-    while (j + 1 < obs.length && obs[j + 1].x - end < (level.speedAt(end) * v.flapSettleMs) / 1000) {
-      j++;
-      end = Math.max(end, obs[j].x + obs[j].w);
-    }
-    clusters.push({ a: i, b: j + 1, end });
-    i = j + 1;
+  const idle = idleBot(c);
+  m.idle = idle.pct;
+  if (idle.won || idle.pct >= 0.1) fail.push(`idle bot reached ${(idle.pct * 100).toFixed(0)}%`);
+  const spam = spamSweep(c);
+  m.spamMax = Math.max(...spam.map((s) => s.pct));
+  const worst = spam.find((s) => s.pct === m.spamMax);
+  m.spamWorst = worst;
+  if (m.spamMax >= 0.25) fail.push(`spam bot reached ${(m.spamMax * 100).toFixed(0)}% at ${worst.ms}ms/${worst.hold}ms`);
+  const variants = opts.variants || [{ width: 160 }, { width: 320 }];
+  let chosen = null;
+  m.reach = 0;
+  for (const v of variants) {
+    const ev = search(c, v);
+    m.reach = Math.max(m.reach, reach.v);
+    if (!ev || !runEvents(c, ev).won) continue;
+    const cen = centered(c, ev);
+    const mw = Math.min(...cen.windows.map((w) => (w.hi - w.lo + 1) * DT * 1000));
+    if (!chosen || mw > chosen.mw) chosen = { ...cen, mw };
   }
-  let sims = 0;
-  for (let c = 0; c < clusters.length; c++) {
-    const cl = clusters[c];
-    const first = obs[cl.a];
-    const d0 = Math.max(0, first.x - t.size - (level.speedAt(first.x) * v.flapLeadMs) / 1000);
-    const dEnd = cl.end + t.size + 40;
-    let layer = [];
-    for (let y = ceilY; y <= floorY; y += v.flapSeedStep) {
-      layer.push({ y, vy: 0, held: false, heldMs: 0, glideLeft: t.glideMs, tap: NEVER });
-    }
-    let d = d0;
-    while (d < dEnd && layer.length > 0) {
-      const next = [];
-      const seen = new Set();
-      let dNext = d;
-      for (let n = 0; n < layer.length; n++) {
-        for (let act = 0; act < 3; act++) {
-          const from = layer[n];
-          const presses = act === 1 || (act === 2 && !from.held);
-          if (presses && from.tap < v.flapMinTapMs) continue;
-          sims++;
-          mode.loadState(from);
-          let tap = from.tap;
-          if (act === 0) {
-            if (mode.held) mode.onRelease();
-          } else if (act === 1) {
-            mode.onPress();
-            mode.onRelease();
-            tap = 0;
-          } else if (!mode.held) {
-            mode.onPress();
-            tap = 0;
-          }
-          let d2 = d;
-          let ok = true;
-          for (let k = 0; k < v.flapSteps; k++) {
-            if (mode.held) mode.onHold(mode.heldMs);
-            d2 = stepMode(sim, level, d2, dt);
-            tap += dt * 1000;
-            if (mode.held) mode.heldMs += dt * 1000;
-            if (collides(sim, level, d2, cl.a, cl.b, v.flapMargin)) {
-              ok = false;
-              break;
-            }
-          }
-          dNext = d2;
-          if (!ok) continue;
-          const st = mode.saveState({});
-          st.tap = tap;
-          const key = flapKey(st);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          next.push(st);
-        }
-      }
-      if (next.length > v.flapBeam) {
-        next.sort((p, q) => p.y - q.y);
-        const keep = [];
-        const stride = next.length / v.flapBeam;
-        for (let k = 0; k < v.flapBeam; k++) keep.push(next[Math.floor(k * stride)]);
-        layer = keep;
-      } else {
-        layer = next;
-      }
-      d = dNext;
-    }
-    if (layer.length === 0) return { ok: false, deepest: cl.a, exhausted: false, sims, airDistance: 0 };
+  if (!chosen) {
+    fail.push('unbeatable');
+    return { ok: false, fail, m, c };
   }
-  return { ok: true, deepest: obs.length - 1, exhausted: false, sims, airDistance: 0 };
-}
-
-function flipKey(s) {
-  return Math.round(s.y / 6) + '|' + Math.round(s.vy / 100) + '|' + s.dir + '|' + Math.min(3, Math.floor(s.since / 60));
-}
-
-function flipReach(level) {
-  const v = tuning.validator;
-  const t = tuning.flip;
-  const obs = level.obstacles;
-  const sim = makeSim(level);
-  const mode = sim.mode;
-  const dt = 1 / tuning.sim.hz;
-  const floorY = sim.env.groundY() - t.size;
-  const ceilY = sim.env.groundY() - t.fieldH;
-  const clusters = clusterize(level, v.flipSettleMs);
-  let sims = 0;
-  for (let c = 0; c < clusters.length; c++) {
-    const cl = clusters[c];
-    const first = obs[cl.a];
-    const d0 = Math.max(0, first.x - t.size - (level.speedAt(first.x) * v.flipLeadMs) / 1000);
-    const dEnd = cl.end + t.size + 40;
-    let layer = [
-      { y: floorY, vy: 0, dir: 1, since: 1e9 },
-      { y: ceilY, vy: 0, dir: -1, since: 1e9 }
-    ];
-    let d = d0;
-    while (d < dEnd && layer.length > 0) {
-      const next = [];
-      const seen = new Set();
-      let dNext = d;
-      for (let n = 0; n < layer.length; n++) {
-        const from = layer[n];
-        for (let act = 0; act < 2; act++) {
-          if (act === 1 && from.since < v.flipMinFlipMs) continue;
-          sims++;
-          mode.loadState(from);
-          if (act === 1 && !mode.onPress()) continue;
-          let d2 = d;
-          let ok = true;
-          for (let k = 0; k < v.flipSteps; k++) {
-            d2 = stepMode(sim, level, d2, dt);
-            if (collides(sim, level, d2, cl.a, cl.b, v.flipMargin)) {
-              ok = false;
-              break;
-            }
-          }
-          dNext = d2;
-          if (!ok) continue;
-          const st = mode.saveState({});
-          const key = flipKey(st);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          next.push(st);
-        }
-      }
-      if (next.length > v.flipBeam) {
-        next.sort((p, q) => p.y - q.y);
-        const keep = [];
-        const stride = next.length / v.flipBeam;
-        for (let k = 0; k < v.flipBeam; k++) keep.push(next[Math.floor(k * stride)]);
-        layer = keep;
-      } else {
-        layer = next;
-      }
-      d = dNext;
-    }
-    if (layer.length === 0) return { ok: false, deepest: cl.a, exhausted: false, sims, airDistance: 0 };
-  }
-  return { ok: true, deepest: obs.length - 1, exhausted: false, sims, airDistance: 0 };
-}
-
-function clusterize(level, settleMs) {
-  const obs = level.obstacles;
-  const clusters = [];
-  let i = 0;
-  while (i < obs.length) {
-    let j = i;
-    let end = obs[i].x + obs[i].w;
-    while (j + 1 < obs.length && obs[j + 1].x - end < (level.speedAt(end) * settleMs) / 1000) {
-      j++;
-      end = Math.max(end, obs[j].x + obs[j].w);
-    }
-    clusters.push({ a: i, b: j + 1, end });
-    i = j + 1;
-  }
-  return clusters;
-}
-
-export function validateReachability(level) {
-  if (level.mode === 'flip') return flipReach(level);
-  if (level.mode === 'flap') return flapReach(level);
-  const ctx = makeContext(level);
-  const ok = solve(ctx, 0, 0);
-  return { ok, deepest: ctx.deepest, exhausted: ctx.exhausted, sims: ctx.sims, airDistance: ctx.maxLead };
-}
-
-function label(level, i) {
-  const o = level.obstacles[i];
-  return o ? o.type + ' #' + i + ' at x=' + Math.round(o.x) : 'obstacle #' + i;
-}
-
-export function validateLevel(level) {
-  const v = tuning.validator;
-  const errors = [];
-  let seconds = 0;
-  for (let d = 0; d < level.length; d += 10) seconds += 10 / level.speedAt(d);
-  if (seconds < v.minSeconds || seconds > v.maxSeconds) {
-    errors.push('duration ' + seconds.toFixed(1) + 's outside ' + v.minSeconds + '-' + v.maxSeconds + 's');
-  }
-  const size = tuning[level.mode === 'run' || !level.mode ? 'run' : level.mode].size;
-  const reactOk = (from) => {
-    const first = level.obstacles.find((o) => o.x - size >= from);
-    if (!first) return true;
-    return ((first.x - size - from) / level.speedAt(from)) * 1000 >= v.minReactMs;
-  };
-  if (!reactOk(0)) errors.push('first obstacle leaves under ' + v.minReactMs + ' ms to react after the start');
-
-  let sims = 0;
-  if (level.mode && level.mode !== 'run') {
-    const r = validateReachability(level);
-    sims = r.sims;
-    if (!r.ok) errors.push('unreachable near ' + label(level, r.deepest));
-  } else {
-    const ctx = makeContext(level);
-    const ok = solve(ctx, 0, 0);
-    sims += ctx.sims;
-    if (!ok) errors.push((ctx.exhausted ? 'search budget exceeded' : 'unreachable') + ' near ' + label(level, ctx.deepest));
-  }
-  return { ok: errors.length === 0, errors, seconds, sims };
+  const { pairs, windows } = chosen;
+  const ms = windows.map((w) => (w.hi - w.lo + 1) * DT * 1000);
+  m.inputs = pairs.length;
+  m.ips = pairs.length / c.duration;
+  m.press = pairs.map((p, k) => {
+    const o = c.reactables.find((r) => r.te >= p[0] * DT - 0.05);
+    return { t: p[0] * DT, w: ms[k], r: o ? (p[0] * DT - o.vis) * 1000 : 9999, tb: o ? o.tb : p[0] * DT };
+  });
+  m.minWindow = Math.min(...ms);
+  m.wide = ms.filter((v) => v > 400).length / ms.length;
+  m.windows = ms.map((v, k) => {
+    const o = c.reactables.find((r) => r.te >= pairs[k][0] * DT - 0.05);
+    return `${(pairs[k][0] * DT).toFixed(1)}s ${o ? o.kind : '-'} ${Math.round(v)}`;
+  });
+  const times = pairs.map((p) => p[0] * DT).sort((a, b) => a - b);
+  const gaps = [times[0], ...times.slice(1).map((t, i) => t - times[i]), c.duration - times[times.length - 1]];
+  m.maxGap = Math.max(...gaps);
+  let react = Infinity;
+  pairs.forEach((p, k) => {
+    const tp = p[0] * DT;
+    const o = c.reactables.find((r) => r.te >= tp - 0.05);
+    if (o) react = Math.min(react, (tp - o.vis) * 1000);
+  });
+  m.reaction = react;
+  if (m.minWindow < gate.window) fail.push(`tightest window ${m.minWindow.toFixed(0)}ms < ${gate.window}`);
+  if (m.wide > 0.3) fail.push(`${(m.wide * 100).toFixed(0)}% of windows over 400ms`);
+  if (react < gate.reaction) fail.push(`reaction ${react.toFixed(0)}ms < ${gate.reaction}`);
+  if (m.ips < gate.ips[0] || m.ips > gate.ips[1]) fail.push(`inputs/s ${m.ips.toFixed(2)} outside ${gate.ips.join('-')}`);
+  if (m.maxGap > gate.gap) fail.push(`no-input stretch ${m.maxGap.toFixed(2)}s > ${gate.gap}`);
+  const jr = jitterBot(c, pairs, opts.jitter);
+  m.jitter = jr;
+  if (jr < gate.jitter[0] || jr > gate.jitter[1]) fail.push(`jitter clear rate ${(jr * 100).toFixed(0)}% outside ${gate.jitter.map((v) => v * 100).join('-')}%`);
+  return { ok: fail.length === 0, fail, m, c, pairs };
 }

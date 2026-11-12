@@ -1,134 +1,112 @@
-import './ui/themes.css';
-import { applyTheme } from './config/tokens.js';
-import { Sound } from './engine/audio.js';
-import { tuning } from './config/tuning.js';
+import '@fontsource-variable/jetbrains-mono';
 import { Loop } from './engine/loop.js';
 import { Input } from './engine/input.js';
 import { SceneManager } from './engine/scenes.js';
-import { BootScene } from './ui/menus/boot.js';
-import { MenuScene } from './ui/menus/menu.js';
-import { PauseScene } from './ui/menus/pause.js';
-import { ResultsScene } from './ui/menus/results.js';
-import { WorldSelectScene } from './ui/menus/worldSelect.js';
-import { BossScene } from './levels/bossScene.js';
-import { createSave } from './save.js';
-import { Settings } from './settings.js';
-import { SettingsScene } from './ui/menus/settings.js';
-import { LevelScene } from './levels/levelScene.js';
-import { createDebug } from './debug.js';
+import { createSave } from './engine/save.js';
+import { fitStage } from './engine/stage.js';
+import { createDebug } from './ui/debug.js';
+import { PlayScene } from './scenes/play.js';
+import { TitleScene } from './ui/title.js';
+import { WorldMapScene } from './ui/worldmap.js';
+import { SettingsScene } from './ui/settings.js';
+import { Sound, Music } from './engine/audio.js';
+import { tuning } from './config/tuning.js';
 
-const stage = document.getElementById('stage');
 const canvas = document.getElementById('game');
+const stage = document.getElementById('stage');
 const overlay = document.getElementById('overlay');
-
-const app = {
-  canvas,
-  ctx: canvas.getContext('2d', { alpha: false }),
-  overlay,
-  width: 0,
-  height: 0,
-  dpr: 1,
-  input: new Input(),
-  audio: new Sound(),
-  save: createSave(),
-  settings: null,
-  installPrompt: null,
-  announce: null,
-  scenes: new SceneManager(),
-  loop: null
-};
-
-function resize() {
-  const rect = stage.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, tuning.view.maxDpr);
-  app.width = rect.width;
-  app.height = rect.height;
-  app.dpr = dpr;
-  canvas.width = Math.round(rect.width * dpr);
-  canvas.height = Math.round(rect.height * dpr);
-  app.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-applyTheme('landing');
-const reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-app.settings = new Settings(app.save, { systemReduced: () => reducedQuery.matches });
-reducedQuery.addEventListener('change', () => app.settings.apply());
-
 const live = document.getElementById('live');
-let liveFlip = false;
-app.announce = (text) => {
-  liveFlip = !liveFlip;
-  live.textContent = text + (liveFlip ? '' : '\u200b');
+const rotate = document.getElementById('rotate');
+const ctx = canvas.getContext('2d');
+const motion = matchMedia('(prefers-reduced-motion: reduce)');
+const params = new URLSearchParams(location.search);
+
+const sound = new Sound();
+const app = {
+  ctx,
+  sound,
+  music: new Music(sound),
+  levelId: params.get('level'),
+  stage,
+  overlay,
+  width: tuning.stage.w,
+  height: tuning.stage.h,
+  save: createSave(),
+  input: new Input(),
+  debug: createDebug(),
+  reducedMotion: motion.matches,
+  outline: false,
+  scenes: null,
+  announce: (text) => {
+    live.textContent = text;
+  }
 };
 
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  app.installPrompt = e;
-});
-window.addEventListener('appinstalled', () => {
-  app.installPrompt = null;
-});
+const origStroke = ctx.stroke.bind(ctx);
+const origStrokeRect = ctx.strokeRect.bind(ctx);
+ctx.stroke = (...a) => {
+  if (!app.outline) return origStroke(...a);
+  const lw = ctx.lineWidth;
+  ctx.lineWidth = lw * 1.8 + 1;
+  origStroke(...a);
+  ctx.lineWidth = lw;
+};
+ctx.strokeRect = (...a) => {
+  if (!app.outline) return origStrokeRect(...a);
+  const lw = ctx.lineWidth;
+  ctx.lineWidth = lw * 1.8 + 1;
+  origStrokeRect(...a);
+  ctx.lineWidth = lw;
+};
 
-const unlock = () => app.audio.unlock();
-window.addEventListener('pointerdown', unlock);
-window.addEventListener('keydown', unlock);
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'KeyM' && !e.repeat && !(e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName))) {
-    app.settings.set('sound', !app.settings.get('sound'));
-  }
-});
+app.applySettings = () => {
+  const s = app.save.settings();
+  app.reducedMotion = s.reducedMotion || motion.matches;
+  document.body.classList.toggle('reduced', app.reducedMotion);
+  app.outline = s.outline;
+  sound.setVolume(s.volume);
+  sound.setMuted(s.muted);
+};
+app.applySettings();
+motion.addEventListener('change', app.applySettings);
 
-new ResizeObserver(resize).observe(stage);
-window.addEventListener('resize', resize);
-resize();
+let view = fitStage(canvas, stage);
+const refit = () => {
+  view = fitStage(canvas, stage);
+  rotate.classList.toggle('on', view.portrait);
+};
+window.addEventListener('resize', refit);
+refit();
 
-app.input.attach(stage);
+const scenes = new SceneManager();
+app.scenes = scenes;
+scenes.register('title', new TitleScene(app));
+scenes.register('worldmap', new WorldMapScene(app));
+scenes.register('settings', new SettingsScene(app));
+scenes.register('play', new PlayScene(app));
 
-app.loop = new Loop({
+const loop = new Loop({
   hz: tuning.sim.hz,
   maxFrameMs: tuning.sim.maxFrameMs,
-  update: (dt) => {
-    app.input.update(dt * 1000);
-    app.scenes.update(dt);
-  },
-  render: (alpha) => app.scenes.render(alpha)
-});
-
-app.scenes.register('Boot', new BootScene(app));
-app.scenes.register('Menu', new MenuScene(app));
-app.scenes.register('Level', new LevelScene(app));
-app.scenes.register('Pause', new PauseScene(app));
-app.scenes.register('Results', new ResultsScene(app));
-app.scenes.register('WorldSelect', new WorldSelectScene(app));
-app.scenes.register('Settings', new SettingsScene(app));
-app.scenes.register('Boss', new BossScene(app));
-
-const autoPause = () => {
-  if (app.scenes.name === 'Level') app.scenes.pause('Pause');
-};
-window.addEventListener('blur', autoPause);
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) autoPause();
-});
-
-let slowChecks = 0;
-setInterval(() => {
-  const playing = app.scenes.name === 'Level' || app.scenes.name === 'Boss';
-  if (!playing || app.settings.get('quality') !== 'auto' || app.loop.fps === 0) {
-    slowChecks = 0;
-    return;
+  update: (dt) => scenes.update(dt),
+  render: (alpha) => {
+    app.debug.fps = loop.fps;
+    ctx.setTransform(view.scale, 0, 0, view.scale, 0, 0);
+    scenes.render(alpha);
   }
-  slowChecks = app.loop.fps < tuning.view.lowFps ? slowChecks + 1 : 0;
-  if (slowChecks >= tuning.view.lowFpsChecks) app.settings.downgrade();
-}, 1000);
+});
 
-createDebug(app);
+document.addEventListener('visibilitychange', () => {
+  if (!sound.ctx) return;
+  if (document.hidden) sound.ctx.suspend();
+  else sound.ctx.resume();
+});
+window.addEventListener('blur', () => app.input.reset());
 
-if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 
-app.scenes.go('Boot');
-app.loop.start();
+if (app.levelId) scenes.go('play', { levelId: app.levelId });
+else scenes.go('title');
+loop.start();

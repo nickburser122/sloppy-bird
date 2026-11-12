@@ -1,44 +1,37 @@
 import { Resvg } from '@resvg/resvg-js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const NAVY = '#12123a';
-const ACCENT = '#4338ff';
+const NAVY = '#10131c';
 
 function art() {
   return (
-    '<rect x="104" y="170" width="304" height="250" rx="30" fill="#f7f8fa"/>' +
-    '<path d="M104 296H408V390a30 30 0 0 1-30 30H134a30 30 0 0 1-30-30Z" fill="#dde1f1"/>' +
-    '<rect x="104" y="293" width="304" height="6" fill="#b6bcd6"/>' +
-    '<rect x="140" y="204" width="86" height="14" rx="7" fill="#c3c8e0"/>' +
-    '<rect x="140" y="232" width="62" height="14" rx="7" fill="#d5d9ea"/>' +
-    '<circle cx="306" cy="190" r="132" fill="' + ACCENT + '" opacity="0.2"/>' +
-    '<circle cx="306" cy="190" r="92" fill="' + ACCENT + '" opacity="0.26"/>' +
-    '<path d="M250 96V286L294 246L324 312L358 297L329 232H388Z" fill="' + ACCENT + '" stroke="#ffffff" stroke-width="14" stroke-linejoin="round"/>'
+    '<circle cx="256" cy="256" r="214" fill="none" stroke="#38e8ff" stroke-width="10" opacity="0.28"/>' +
+    '<circle cx="256" cy="256" r="236" fill="none" stroke="#ff7a3d" stroke-width="6" opacity="0.2"/>' +
+    '<path d="M96 196 L168 82 L228 172 Q256 164 284 172 L344 82 L416 196 Q436 306 256 424 Q76 306 96 196 Z" fill="#f2802e"/>' +
+    '<path d="M132 168 L170 112 L200 168 Z" fill="#3a1f1a"/>' +
+    '<path d="M380 168 L342 112 L312 168 Z" fill="#3a1f1a"/>' +
+    '<path d="M256 292 L146 232 Q158 340 256 424 Q354 340 366 232 Z" fill="#ffe9cf"/>' +
+    '<ellipse cx="196" cy="246" rx="15" ry="19" fill="#3a1f1a"/>' +
+    '<ellipse cx="316" cy="246" rx="15" ry="19" fill="#3a1f1a"/>' +
+    '<circle cx="202" cy="238" r="5" fill="#ffffff"/>' +
+    '<circle cx="322" cy="238" r="5" fill="#ffffff"/>' +
+    '<ellipse cx="256" cy="372" rx="22" ry="15" fill="#3a1f1a"/>' +
+    '<path d="M256 300 L246 372 M256 300 L266 372" stroke="#3a1f1a" stroke-width="6" stroke-linecap="round"/>'
   );
 }
 
 function svg(rounded, scale) {
   const radius = rounded ? 112 : 0;
-  const body = scale === 1 ? art() : '<g transform="translate(256 256) scale(' + scale + ') translate(-256 -256)">' + art() + '</g>';
-  return (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="' +
-    radius +
-    '" fill="' +
-    NAVY +
-    '"/>' +
-    body +
-    '</svg>'
-  );
+  const body = scale === 1 ? art() : `<g transform="translate(256 256) scale(${scale}) translate(-256 -256)">${art()}</g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="${radius}" fill="${NAVY}"/>${body}</svg>`;
 }
 
-function png(source, size) {
-  return new Resvg(source, { fitTo: { mode: 'width', value: size } }).render().asPng();
-}
+const png = (source, size) => new Resvg(source, { fitTo: { mode: 'width', value: size } }).render().asPng();
 
 mkdirSync('public/icons', { recursive: true });
 writeFileSync('public/favicon.svg', svg(true, 1));
 writeFileSync('public/icons/icon-192.png', png(svg(true, 1), 192));
 writeFileSync('public/icons/icon-512.png', png(svg(true, 1), 512));
-writeFileSync('public/icons/icon-maskable-512.png', png(svg(false, 0.84), 512));
+writeFileSync('public/icons/icon-maskable-512.png', png(svg(false, 0.78), 512));
 writeFileSync('public/icons/apple-touch-icon.png', png(svg(false, 0.9), 180));
 console.log('icons written');

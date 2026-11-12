@@ -1,196 +1,187 @@
-import { createMode } from '../src/modes/index.js';
-import { createPlayer } from '../src/entities/player.js';
-import { obstacleHits } from '../src/entities/obstacles/types.js';
-import { circleAabb } from '../src/engine/collision.js';
+import { createSim } from '../src/modes/sims.js';
+import { Input } from '../src/engine/input.js';
 import { tuning } from '../src/config/tuning.js';
-import { DT } from '../tests/helpers.js';
 
-const FIELDS = {
-  run: ['vy', 'grounded', 'coyote', 'jumping'],
-  flap: ['vy', 'held', 'heldMs', 'glideLeft', 'gliding'],
-  flip: ['vy', 'dir', 'since', 'rot']
-};
+export const DT = 1 / tuning.sim.hz;
+export const DT_MS = DT * 1000;
 
-function plansFor(kind) {
-  const out = [{ s0: false, ev: [] }];
-  if (kind === 'run') {
-    for (let t = 0; t <= 240; t += 20) for (let h = 0; h <= 400; h += 20) out.push({ s0: false, ev: [{ t, e: 'press' }, { t: t + h, e: 'release' }] });
-    out.push({ s0: true, ev: [] });
-    for (let r = 0; r <= 400; r += 20) out.push({ s0: true, ev: [{ t: r, e: 'release' }] });
-    for (let t = 0; t <= 240; t += 40) {
-      for (const h of [0, 60, 120, 200, 400]) {
-        for (let g = 250; g <= 700; g += 50) {
-          for (const h2 of [0, 100, 200, 400]) {
-            const a = t + h;
-            const b = a + g;
-            out.push({ s0: false, ev: [{ t, e: 'press' }, { t: a, e: 'release' }, { t: b, e: 'press' }, { t: b + h2, e: 'release' }] });
-          }
-        }
-      }
-    }
-    for (let r = 0; r <= 400; r += 40) {
-      for (let g = 250; g <= 700; g += 50) {
-        for (const h2 of [0, 100, 200, 400]) out.push({ s0: true, ev: [{ t: r, e: 'release' }, { t: r + g, e: 'press' }, { t: r + g + h2, e: 'release' }] });
-      }
-    }
-  } else if (kind === 'flap') {
-    for (const per of [150, 170, 190, 210, 240, 280, 340, 420, 600]) {
-      for (const off of [0, 40, 80, 120]) {
-        const ev = [];
-        for (let t = off; t < 1500; t += per) ev.push({ t, e: 'tap' });
-        out.push({ s0: false, ev });
-      }
-    }
-    for (const a of [150, 200, 260, 340]) for (const b of [200, 300, 450, 700]) for (const sw of [200, 400, 600, 800]) {
-      const ev = [];
-      let t = 0;
-      while (t < sw) { ev.push({ t, e: 'tap' }); t += a; }
-      t = Math.max(t, sw);
-      while (t < 1500) { ev.push({ t, e: 'tap' }); t += b; }
-      out.push({ s0: false, ev });
-    }
-    for (const a of [0, 100, 300]) for (const b of [400, 700]) out.push({ s0: false, ev: [{ t: a, e: 'tap' }, { t: a + b, e: 'tap' }] });
-    for (let t = 0; t <= 300; t += 60) out.push({ s0: false, ev: [{ t, e: 'tap' }] });
-  } else if (kind === 'flip') {
-    const g = [];
-    for (let t = 0; t <= 700; t += 25) g.push(t);
-    for (const a of g) out.push({ s0: false, ev: [{ t: a, e: 'tap' }] });
-    for (const a of g) for (const b of g) if (b >= a + 100) out.push({ s0: false, ev: [{ t: a, e: 'tap' }, { t: b, e: 'tap' }] });
+export function stepOnce(sim, inp, want) {
+  if (want !== inp.sources.size > 0) inp.setSource('b', want);
+  inp.update(DT_MS);
+  sim.update(DT, inp);
+}
+
+function snapInp(inp) {
+  return { d: inp.sources.size > 0, b: inp.bufferLeft, h: inp.heldMs, p: inp.pressed, r: inp.released, dn: inp.down };
+}
+
+function restoreInp(inp, s) {
+  inp.sources.clear();
+  if (s.d) inp.sources.add('b');
+  inp.bufferLeft = s.b;
+  inp.heldMs = s.h;
+  inp.pressed = s.p;
+  inp.released = s.r;
+  inp.down = s.dn;
+  inp.pendingPress = false;
+  inp.pendingRelease = false;
+}
+
+export function runEvents(c, events, extra = 0) {
+  const sim = createSim(c);
+  const inp = new Input();
+  const sorted = events.slice().sort((a, b) => a[0] - b[0] || (a[1] ? 1 : -1));
+  const total = Math.ceil(c.duration / DT) + 2 + extra;
+  let idx = 0;
+  let want = false;
+  for (let i = 0; i < total && !sim.dead && !sim.won; i++) {
+    while (idx < sorted.length && sorted[idx][0] <= sim.tick) want = sorted[idx++][1];
+    stepOnce(sim, inp, want);
   }
+  return { got: sim.shardGot, won: sim.won, dead: sim.dead, cause: sim.cause, tick: sim.tick, pct: sim.won ? 1 : Math.min(1, sim.t / c.duration), sim };
+}
+
+export const reach = { v: 0 };
+
+export function search(c, { width = 320, decide = 2, slack = 3, needShard = false } = {}) {
+  reach.v = 0;
+  if (c.level.mode === 'flap') slack = Math.max(slack, 40);
+  const sim = createSim(c);
+  const inp = new Input();
+  const total = Math.ceil(c.duration / DT) + 2;
+  const steps = Math.ceil(total / decide);
+  let heurOn = typeof sim.heur === 'function' && !sim.useHeur;
+  let layer = [{ s: sim.snap(), i: snapInp(inp), want: false, presses: 0, parent: null }];
+  const finish = (node, step) => {
+    const wants = [];
+    for (let n = node; n.parent; n = n.parent) wants.push(n.want);
+    wants.reverse();
+    const events = [];
+    let prev = false;
+    for (let k = 0; k < wants.length; k++) {
+      if (wants[k] !== prev) events.push([k * decide, wants[k]]);
+      prev = wants[k];
+    }
+    if (prev) events.push([wants.length * decide, false]);
+    return events;
+  };
+  for (let step = 0; step < steps; step++) {
+    const next = new Map();
+    let won = null;
+    let layerHeur = heurOn;
+    for (const n of layer) {
+      for (let o = 0; o < 2; o++) {
+        const want = o === 1;
+        sim.restore(n.s);
+        restoreInp(inp, n.i);
+        for (let k = 0; k < decide && !sim.dead && !sim.won; k++) stepOnce(sim, inp, want);
+        if (sim.dead) continue;
+        const presses = n.presses + (want && !n.want ? 1 : 0);
+        if (sim.useHeur) layerHeur = sim.useHeur();
+        if (sim.won) {
+          if (needShard && !sim.shardGot) continue;
+          if (!won || presses < won.presses) won = { s: null, i: null, want, presses, parent: n };
+          continue;
+        }
+        const key = sim.key(want ? 1 : 0, inp.bufferLeft > 0 ? 1 : 0);
+        const old = next.get(key);
+        if (!old || presses < old.presses) next.set(key, { s: sim.snap(), i: snapInp(inp), want, presses, parent: n, h: layerHeur || heurOn ? sim.heur() : 0 });
+      }
+    }
+    if (won) return finish(won, step);
+    let arr = Array.from(next.entries());
+    if (!arr.length) {
+      reach.v = step / steps;
+      return null;
+    }
+    const minP = Math.min(...arr.map((e) => e[1].presses));
+    arr = arr.filter((e) => e[1].presses <= minP + slack);
+    if (arr.length > width && (heurOn || layerHeur)) {
+      for (const e of arr) e[2] = e[1].h;
+      arr.sort((a, b) => a[2] - b[2]);
+      const top = Math.ceil(width * 0.7);
+      const rest = arr.slice(top);
+      const stride = rest.length / (width - top);
+      const pick = arr.slice(0, top);
+      for (let k = 0; k < width - top; k++) pick.push(rest[Math.floor(k * stride)]);
+      arr = pick;
+    } else if (arr.length > width) {
+      arr.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+      const stride = arr.length / width;
+      const pick = [];
+      for (let k = 0; k < width; k++) pick.push(arr[Math.floor(k * stride)]);
+      arr = pick;
+    }
+    layer = arr.map((e) => e[1]);
+  }
+  return null;
+}
+
+export function toPairs(events) {
+  const pairs = [];
+  for (let i = 0; i < events.length; i += 2) pairs.push([events[i][0], events[i + 1] ? events[i + 1][0] : events[i][0] + 1]);
+  return pairs;
+}
+
+export function fromPairs(pairs) {
+  const ev = [];
+  for (const [a, b] of pairs) {
+    ev.push([a, true]);
+    ev.push([Math.max(b, a + 1), false]);
+  }
+  return ev;
+}
+
+function shifted(pairs, k, s) {
+  const out = pairs.map((p) => p.slice());
+  out[k][0] += s;
+  out[k][1] += s;
   return out;
 }
 
-const PLANS = {};
-function plans(kind) {
-  if (!PLANS[kind]) PLANS[kind] = plansFor(kind);
-  return PLANS[kind];
+const clears = (c, pairs) => runEvents(c, fromPairs(pairs)).won;
+
+export function windowOf(c, pairs, k, cap = 90) {
+  if (!clears(c, pairs)) return { lo: 0, hi: -1 };
+  let lo = 0;
+  while (lo > -cap && clears(c, shifted(pairs, k, lo - 1))) lo--;
+  let hi = 0;
+  while (hi < cap && clears(c, shifted(pairs, k, hi + 1))) hi++;
+  return { lo, hi };
 }
 
-export function makeBot(sc, app) {
-  const kind0 = () => sc.modeKind;
-  let cache = null;
-  const state = { plan: null, t0: 0, fired: 0, heldBy: false, since: 0 };
-  const box = { x: 0, y: 0, w: 0, h: 0 };
-  const circle = { x: 0, y: 0, r: 0 };
-
-  function sim(kind, plan, horizonSteps) {
-    if (!cache || cache.kind !== kind || cache.env !== sc.env) {
-      const pl = createPlayer();
-      cache = { kind, env: sc.env, pl, mode: createMode(kind, pl, sc.env) };
-    }
-    const { pl, mode } = cache;
-    const live = sc.mode;
-    const rt = sc.runtime;
-    for (const f of FIELDS[kind]) mode[f] = live[f];
-    pl.x = sc.player.x; pl.y = sc.player.y; pl.prevY = sc.player.prevY; pl.size = sc.player.size;
-    const gy = sc.env.groundY();
-    let d = rt.distance;
-    const level = sc.level;
-    const obs = level.obstacles;
-    let lo = 0;
-    while (lo < obs.length && obs[lo].x + obs[lo].w < d - 300) lo++;
-    const orb = sc.director && sc.director.cur && !sc.director.cur.done ? sc.director.cur.orb : null;
-    let ei = 0;
-    const down = app.input.down;
-    let heldMs = down ? app.input.heldMs : 0;
-    let held = down;
-    const evs = plan.ev;
-    if (held && !plan.s0) { mode.onRelease(); held = false; }
-    else if (!held && plan.s0) { mode.onPress(); held = true; heldMs = 0; }
-    let orbBest = Infinity;
-    let gotOrb = false;
-    for (let n = 0; n < horizonSteps; n++) {
-      const ms = n * DT * 1000;
-      while (ei < evs.length && evs[ei].t <= ms) {
-        const ev = evs[ei++];
-        if (ev.e === 'press' || ev.e === 'tap') {
-          if (kind === 'flip') { mode.onPress(); } else { mode.onPress(); held = true; heldMs = 0; }
-          if (ev.e === 'tap') { mode.onRelease(); held = false; }
-        } else if (ev.e === 'release') { mode.onRelease(); held = false; }
-      }
-      if (held) { mode.onHold(heldMs); heldMs += DT * 1000; }
-      const mul = mode.speedMul ? mode.speedMul() : 1;
-      const step = level.speedAt(d) * mul * DT;
-      mode.d = d + step;
-      mode.dx = step;
-      mode.update(DT);
-      d += step;
-      const hb = mode.getHitbox();
-      const px = pl.x;
-      for (let i = lo; i < obs.length; i++) {
-        const o = obs[i];
-        const sx = px + o.x - d;
-        if (sx > px + 200) break;
-        if (sx + o.w < px - 10) continue;
-        if (obstacleHits(hb, o, sx, gy, d, box, circle)) return { alive: false, n };
-      }
-      if (orb && !orb.got) {
-        circle.x = px + orb.x - d;
-        circle.y = gy - orb.lift;
-        circle.r = tuning.orb.r;
-        if (circleAabb(circle, hb)) gotOrb = true;
-        const dx = Math.abs(circle.x - (hb.x + hb.w / 2));
-        if (dx < 40) {
-          const dy = Math.abs(circle.y - (hb.y + hb.h / 2));
-          if (dy < orbBest) orbBest = dy;
-        }
-      }
-    }
-    return { alive: true, n: horizonSteps, gotOrb, orbBest };
+export function prune(c, pairs) {
+  let cur = pairs;
+  for (let k = cur.length - 1; k >= 0; k--) {
+    const cand = cur.filter((_, i) => i !== k);
+    if (clears(c, cand)) cur = cand;
   }
+  return cur;
+}
 
-  function replan() {
-    const kind = kind0();
-    const H = 170;
-    let bestPlan = null;
-    let bestScore = -Infinity;
-    for (const p of plans(kind)) {
-      const r = sim(kind, p, H);
-      if (!r.alive) continue;
-      let score = 1000 - p.ev.length;
-      if (r.gotOrb) score += 5000;
-      else if (r.orbBest < Infinity) score += 300 - Math.min(300, r.orbBest);
-      if (score > bestScore) { bestScore = score; bestPlan = p; }
-    }
-    if (!bestPlan) {
-      let far = -1;
-      for (const p of plans(kind)) {
-        const r = sim(kind, p, H);
-        if (r.n > far) { far = r.n; bestPlan = p; }
+export function centered(c, events) {
+  let pairs = prune(c, toPairs(events));
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 0; k < pairs.length; k++) {
+      const w = windowOf(c, pairs, k);
+      const mid = Math.round((w.lo + w.hi) / 2);
+      if (mid !== 0) {
+        const cand = shifted(pairs, k, mid);
+        if (clears(c, cand)) pairs = cand;
       }
     }
-    state.plan = bestPlan;
-    state.t0 = 0;
-    state.fired = 0;
   }
+  const windows = pairs.map((_, k) => windowOf(c, pairs, k));
+  return { pairs, windows };
+}
 
-  let frame = 0;
-  let lastKind = null;
-  let lastRestart = -1;
-  return function act() {
-    const kind = kind0();
-    const rt = sc.runtime;
-    if (rt.state !== 'running') { app.input.setSource('bot', false); state.plan = null; return; }
-    if (kind !== lastKind || rt.restartCount !== lastRestart) { state.plan = null; lastKind = kind; lastRestart = rt.restartCount; }
-    let replanned = false;
-    if (!state.plan || frame % 6 === 0) { replan(); replanned = true; }
-    frame++;
-    if (replanned) {
-      const isDown = app.input.sources.has('bot');
-      if (isDown && !state.plan.s0) { app.input.setSource('bot', false); state.t0 = -DT * 1000 * 1.5; }
-      else if (!isDown && state.plan.s0) app.input.setSource('bot', true);
-    }
-    const ms = state.t0;
-    const ev = state.plan.ev;
-    while (state.fired < ev.length && ev[state.fired].t <= ms) {
-      const e = ev[state.fired++];
-      if (e.e === 'press') app.input.setSource('bot', true);
-      else if (e.e === 'release') app.input.setSource('bot', false);
-      else if (e.e === 'tap') {
-        app.input.setSource('bot', true);
-        app.input.setSource('bot', false);
-      }
-    }
-    state.t0 += DT * 1000;
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
