@@ -26,10 +26,11 @@ Open the printed URL. Input is Space / Up / click / tap. `Esc` returns to the ma
 
 ## Progress and meta
 
-- Clear 3 of 4 levels in a world to open the next. World 5 needs all 16 earlier levels cleared. A world's **Gauntlet** (its levels back to back, zero deaths) opens once the world is fully cleared.
-- Medals: ● clear, ★ clean (10 or fewer attempts in a session, or a first-try re-clear), ◆ shard (a collectible on a riskier line, placed and verified by the bot; Pier Pressure has none).
-- The best attempt plays back as a translucent ghost from recorded inputs.
-- Settings: sound, volume, slow mode ×0.75 (clears don't count toward unlocks), reduced motion, bold outlines, reset. Reduced motion also follows the OS setting.
+- Every world and level is open from the start, so you can begin anywhere.
+- Clearing all of a world's levels opens two extras for it: **Endless** (its levels in random order, looping forever, 5% faster each lap, one life, scored as levels cleared plus progress) and the **Gauntlet** (its levels back to back with zero deaths).
+- Medals: ● clear, ★ clean (10 or fewer attempts in a session, or a first-try re-clear), ◆ shard (a collectible on a riskier line, placed and verified by the bot; 1-3, 3-2 and 5-2 have none).
+- Optional ghost marker (settings, off by default): a ring showing where your best attempt is, replayed from recorded inputs.
+- Settings: sound, volume, slow mode ×0.75 (clears don't earn medals; not available in endless or gauntlet), reduced motion, bold outlines, reset. Reduced motion also follows the OS setting.
 - Save key: `nerve.save.v1` in `localStorage`.
 
 ## How it is built
@@ -71,22 +72,26 @@ npm run icons                  regenerate app icons
 
 ## Known gate misses
 
-Every gate passes on these levels: 1-1, 1-2, 1-4, 2-1, 2-3, 2-4, 3-1, 4-1, 4-2. These miss one or more and are recorded explicitly in `tests/levels.test.js` (any other failure breaks the tests):
+Levels that pass every gate: 1-1, 2-1, 2-3, 2-4, 3-1, 4-1, 4-2. The rest miss one or more and are recorded in `tests/levels.test.js` (any other failure breaks the tests):
 
 | Level | Misses |
 |---|---|
-| 1-3 Rotten Bridge | tightest window 83 ms (needs 90) |
-| 2-2 Silk Road | reaction 325 ms (needs 330) |
-| 3-2 Pier Pressure | reaction, inputs per second, no-input stretch, jitter |
-| 3-3 Reef Run | tightest window, wide-window share, no-input stretch, jitter |
-| 3-4 Riptide | tightest window, wide-window share, inputs per second, no-input stretch |
-| 4-3 Compactor | inputs per second |
-| 4-4 Zero G | inputs per second, no-input stretch |
-| 5-1 Handshake | inputs per second, no-input stretch |
-| 5-2 Switchback | inputs per second, no-input stretch |
-| 5-★ Nerve | no-input stretch, jitter |
+| 1-2 Low Branches | tightest window |
+| 1-3 Rotten Bridge | tightest window, jitter |
+| 1-4 Wildfire | tightest window, tightest hold window, jitter |
+| 2-2 Silk Road | reaction |
+| 3-2 Pier Pressure | reaction, inputs/s, no-input stretch, jitter |
+| 3-3 Reef Run | tightest window, of windows over 400ms, no-input stretch, jitter |
+| 3-4 Riptide | tightest window, no-input stretch, jitter |
+| 4-3 Compactor | inputs/s |
+| 4-4 Zero G | inputs/s, no-input stretch |
+| 5-1 Handshake | inputs/s, no-input stretch |
+| 5-2 Switchback | inputs/s, no-input stretch |
+| 5-★ Nerve | no-input stretch, tightest hold window, jitter |
 
-Not yet done: the "jump to beat N" and validator-window overlays in the debug panel, and a measured first-time-player attempt count for 1-1. Performance is budgeted by test (a sim tick costs well under a millisecond and particles are pooled) but has not been profiled on a real phone.
+The **hold window** gate matters most for humans: it measures how forgiving the release time is on every jump or dive (a plain tap is 40-100 ms). Before it existed, the ceiling-over-spike obstacles in world 1 could only be cleared with a 8-25 ms tap, which nobody can do. They are now cleared by any tap up to about 95 ms and fail on holds of 100 ms or more. Levels 1-4 and 5-★ still have one spot each with a hold window of 42 ms against the 50 ms target.
+
+Not yet done: the "jump to beat N" and validator-window overlays in the debug panel, and a measured first-time-player attempt count for 1-1. Performance is budgeted by test but has not been profiled on a real phone.
 
 ## Deploy
 

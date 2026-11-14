@@ -10,16 +10,11 @@ export const clearedCount = (save, w) => worldLevels(w).filter((l) => isCleared(
 
 export const worldComplete = (save, w) => worldLevels(w).length > 0 && clearedCount(save, w) === worldLevels(w).length;
 
-export function worldUnlocked(save, w) {
-  if (w === 1) return true;
-  if (w === 5) return [1, 2, 3, 4].every((k) => worldComplete(save, k));
-  return clearedCount(save, w - 1) >= 3;
-}
+export const worldUnlocked = () => true;
 
-export const levelUnlocked = (save, id) => {
-  const l = levels.find((x) => x.id === id);
-  return !!l && worldUnlocked(save, l.world);
-};
+export const levelUnlocked = (save, id) => levels.some((l) => l.id === id);
+
+export const endlessUnlocked = (save, w) => worldComplete(save, w);
 
 export const gauntletUnlocked = (save, w) => worldComplete(save, w);
 

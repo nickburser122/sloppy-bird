@@ -1,6 +1,6 @@
 import { compile, modeOfEvent, segmentAt } from './runtime.js';
 import { tuning } from '../config/tuning.js';
-import { search, centered, runEvents, DT, reach } from '../../playtest/bot.js';
+import { search, centered, runEvents, holdWidths, DT, reach } from '../../playtest/bot.js';
 import { idleBot } from '../../playtest/idle-bot.js';
 import { spamSweep } from '../../playtest/spam-bot.js';
 import { jitterBot } from '../../playtest/jitter-bot.js';
@@ -80,6 +80,13 @@ export function validate(level, opts = {}) {
   if (react < gate.reaction) fail.push(`reaction ${react.toFixed(0)}ms < ${gate.reaction}`);
   if (m.ips < gate.ips[0] || m.ips > gate.ips[1]) fail.push(`inputs/s ${m.ips.toFixed(2)} outside ${gate.ips.join('-')}`);
   if (m.maxGap > gate.gap) fail.push(`no-input stretch ${m.maxGap.toFixed(2)}s > ${gate.gap}`);
+  const releaseMatters = level.mode === 'run' || level.mode === 'surf' || level.mode === 'mix';
+  m.hold = Infinity;
+  if (releaseMatters) {
+    const hw = holdWidths(c, pairs);
+    for (const x of hw) if (x.hi < 100) m.hold = Math.min(m.hold, x.w);
+    if (m.hold < 50) fail.push(`tightest hold window ${m.hold.toFixed(0)}ms < 50`);
+  }
   const jr = jitterBot(c, pairs, opts.jitter);
   m.jitter = jr;
   if (jr < gate.jitter[0] || jr > gate.jitter[1]) fail.push(`jitter clear rate ${(jr * 100).toFixed(0)}% outside ${gate.jitter.map((v) => v * 100).join('-')}%`);

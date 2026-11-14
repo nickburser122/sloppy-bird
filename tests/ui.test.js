@@ -51,8 +51,9 @@ describe('menu flow', () => {
     h.click('[data-act="play"]');
     h.tick(2);
     expect(h.scenes.name).toBe('worldmap');
-    expect(h.app.overlay.querySelectorAll('.node').length).toBe(19);
-    expect(h.app.overlay.querySelectorAll('.world.locked').length).toBe(4);
+    expect(h.app.overlay.querySelectorAll('.chip').length).toBe(19);
+    expect(h.app.overlay.querySelectorAll('.wl').length).toBe(5);
+    expect(h.app.overlay.querySelector('[data-endless="1"]').disabled).toBe(true);
     h.click('[data-level="w1-l1"]');
     h.tick(3);
     expect(h.scenes.name).toBe('play');
@@ -79,6 +80,7 @@ describe('menu flow', () => {
 
   it('replays the saved ghost in lockstep with an identical run', () => {
     const play = h.scenes.current;
+    h.app.save.setSetting('ghost', true);
     h.click('[data-act="retry"]');
     h.tick(1);
     expect(play.ghostSim).not.toBeNull();
@@ -131,7 +133,7 @@ describe('menu flow', () => {
     h.app.input.setSource('k', false);
     for (let i = 0; i < 2000 && !h.scenes.current.failed; i++) h.scenes.update(1 / 120);
     expect(h.scenes.current.failed).toBe(true);
-    expect(h.app.overlay.textContent).toContain('GAUNTLET FAILED');
+    expect(h.app.overlay.textContent).toContain('gauntlet failed');
   });
 
   it('plays the six-switch finale through every mode in the real scene', () => {
@@ -153,4 +155,46 @@ describe('menu flow', () => {
     expect(play.winT).toBeGreaterThanOrEqual(0);
     expect([...seen].sort()).toEqual(['flap', 'flip', 'run', 'surf']);
   }, 120000);
+
+  it('starts from any world and runs endless once its world is cleared, scoring on death', () => {
+    h.scenes.go('worldmap');
+    h.tick(2);
+    h.click('[data-level="w4-l1"]');
+    h.tick(2);
+    expect(h.scenes.name).toBe('play');
+    expect(h.scenes.current.level.id).toBe('w4-l1');
+    for (const id of ['w1-l1', 'w1-l2', 'w1-l3', 'w1-l4']) h.app.save.level(id).clear = true;
+    h.scenes.go('worldmap');
+    h.tick(2);
+    const en = h.app.overlay.querySelector('[data-endless="1"]');
+    expect(en.disabled).toBe(false);
+    h.click('[data-endless="1"]');
+    h.tick(2);
+    const play = h.scenes.current;
+    expect(play.endless).not.toBeNull();
+    h.app.input.setSource('k', false);
+    for (let i = 0; i < 2000 && !play.failed; i++) h.scenes.update(1 / 120);
+    expect(play.failed).toBe(true);
+    expect(h.app.overlay.textContent).toContain('endless');
+    expect(h.app.save.endlessBest(1)).toBeGreaterThan(0);
+    h.click('[data-act="again"]');
+    h.tick(2);
+    expect(play.failed).toBe(false);
+    expect(play.endless.cleared).toBe(0);
+  });
+
+  it('speeds the endless run up each lap and keeps medals untouched', async () => {
+    const play = h.scenes.current;
+    const before = JSON.stringify(h.app.save.level('w1-l1'));
+    play.endless.ids = ['w1-l1'];
+    play.endless.i = 0;
+    play.load('w1-l1');
+    play.sim.won = true;
+    play.onClear();
+    expect(play.endless.lap).toBe(1);
+    expect(play.endless.cleared).toBe(1);
+    await new Promise((r) => setTimeout(r, 750));
+    expect(play.timeScale).toBeCloseTo(1.05, 5);
+    expect(JSON.stringify(h.app.save.level('w1-l1')).replace(/"attempts":\d+/, '')).toBe(before.replace(/"attempts":\d+/, ''));
+  });
 });

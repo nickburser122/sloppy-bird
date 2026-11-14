@@ -185,3 +185,25 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+export function holdWidths(c, pairs, up = 14, down = 7) {
+  const out = [];
+  for (let k = 0; k < pairs.length; k++) {
+    const base = Math.max(1, pairs[k][1] - pairs[k][0]);
+    const ok = (h) => {
+      const pr = pairs.map((q) => q.slice());
+      pr[k][1] = pr[k][0] + h;
+      return clears(c, pr);
+    };
+    if (!ok(base)) {
+      out.push({ w: 0, hi: base * DT_MS });
+      continue;
+    }
+    let lo = base;
+    while (lo > Math.max(1, base - down) && ok(lo - 1)) lo--;
+    let hi = base;
+    while (hi < base + up && ok(hi + 1)) hi++;
+    out.push({ w: (hi - lo + 1) * DT_MS, hi: hi * DT_MS });
+  }
+  return out;
+}

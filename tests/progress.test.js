@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createSave } from '../src/engine/save.js';
-import { worldUnlocked, worldComplete, gauntletUnlocked, levelUnlocked, medalsOf, isClean, totals, worldLevels, clearedCount } from '../src/engine/progress.js';
+import { worldUnlocked, endlessUnlocked, worldComplete, gauntletUnlocked, levelUnlocked, medalsOf, isClean, totals, worldLevels, clearedCount } from '../src/engine/progress.js';
 import { levels } from '../src/levels/index.js';
 
 const memStore = () => {
@@ -17,25 +17,20 @@ describe('progress', () => {
     expect([1, 2, 3, 4, 5].map((w) => worldLevels(w).length)).toEqual([4, 4, 4, 4, 3]);
   });
 
-  it('opens a world after three clears in the previous one', () => {
+  it('lets you start in any world from the beginning', () => {
     const save = createSave(memStore());
-    expect(worldUnlocked(save, 1)).toBe(true);
-    expect(worldUnlocked(save, 2)).toBe(false);
-    clear(save, ['w1-l1', 'w1-l2']);
-    expect(worldUnlocked(save, 2)).toBe(false);
-    clear(save, ['w1-l3']);
-    expect(worldUnlocked(save, 2)).toBe(true);
-    expect(levelUnlocked(save, 'w2-l1')).toBe(true);
-    expect(levelUnlocked(save, 'w3-l1')).toBe(false);
+    for (const w of [1, 2, 3, 4, 5]) expect(worldUnlocked(save, w)).toBe(true);
+    expect(levelUnlocked(save, 'w5-boss')).toBe(true);
+    expect(levelUnlocked(save, 'nope')).toBe(false);
   });
 
-  it('opens world 5 only when worlds 1 to 4 are fully cleared', () => {
+  it('unlocks endless only once that whole world is cleared', () => {
     const save = createSave(memStore());
-    const ids = levels.filter((l) => l.world <= 4).map((l) => l.id);
-    clear(save, ids.slice(0, -1));
-    expect(worldUnlocked(save, 5)).toBe(false);
-    clear(save, ids);
-    expect(worldUnlocked(save, 5)).toBe(true);
+    clear(save, ['w3-l1', 'w3-l2', 'w3-l3']);
+    expect(endlessUnlocked(save, 3)).toBe(false);
+    clear(save, ['w3-l4']);
+    expect(endlessUnlocked(save, 3)).toBe(true);
+    expect(endlessUnlocked(save, 4)).toBe(false);
   });
 
   it('unlocks a gauntlet only when its whole world is cleared', () => {
@@ -48,10 +43,10 @@ describe('progress', () => {
     expect(gauntletUnlocked(save, 1)).toBe(true);
   });
 
-  it('keeps slow-mode clears out of the unlock rules', () => {
+  it('keeps slow-mode clears out of the clear medal and endless unlock', () => {
     const save = createSave(memStore());
-    for (const id of ['w1-l1', 'w1-l2', 'w1-l3']) save.level(id).clearSlow = true;
-    expect(worldUnlocked(save, 2)).toBe(false);
+    for (const id of ['w1-l1', 'w1-l2', 'w1-l3', 'w1-l4']) save.level(id).clearSlow = true;
+    expect(endlessUnlocked(save, 1)).toBe(false);
     expect(medalsOf(save.level('w1-l1'))).toEqual({ clear: false, slow: true, clean: false, shard: false });
   });
 
@@ -86,6 +81,10 @@ describe('save', () => {
     expect(b.settings().slow).toBe(true);
     expect(b.settings().volume).toBe(0.2);
     expect(b.settings().outline).toBe(false);
+    expect(b.settings().ghost).toBe(false);
+    b.setEndlessBest(2, 3.4);
+    expect(b.setEndlessBest(2, 1)).toBe(false);
+    expect(b.endlessBest(2)).toBe(3.4);
     expect(b.gauntlet(1)).toBe(true);
     expect(b.level('w1-l1').shard).toBe(true);
   });

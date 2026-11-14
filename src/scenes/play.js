@@ -7,6 +7,7 @@ import { modes } from '../modes/index.js';
 import { compile } from '../levels/runtime.js';
 import { levels, byId } from '../levels/index.js';
 import { worldLevels, isClean } from '../engine/progress.js';
+import { newEndless } from '../ui/worldmap.js';
 import { worlds } from '../config/worlds.js';
 import { tuning } from '../config/tuning.js';
 import { colors, fonts } from '../config/tokens.js';
@@ -28,9 +29,11 @@ export class PlayScene extends Scene {
 
   enter(params = {}) {
     this.gauntlet = params.gauntlet || null;
+    this.endless = params.endless || null;
+    this.chain = this.gauntlet || this.endless;
     this.app.input.attach(this.app.stage);
     this.listen(window, 'keydown', this.onKey);
-    this.hud = this.mount('<div class="hudbtns"><button class="btn small ghost" data-act="map">Map</button><button class="btn small ghost" data-act="settings">⚙</button></div>', 'layer');
+    this.hud = this.mount('<div class="hudbtns"><button class="btn small" data-act="map">map</button><button class="btn small" data-act="settings">settings</button></div>', 'layer');
     this.hud.style.pointerEvents = 'none';
     this.hud.addEventListener('click', (e) => {
       const a = e.target.closest('[data-act]');
@@ -38,7 +41,7 @@ export class PlayScene extends Scene {
       if (a.dataset.act === 'map') this.toMap();
       if (a.dataset.act === 'settings') this.app.scenes.pause('settings');
     });
-    const id = this.gauntlet ? this.gauntlet.ids[this.gauntlet.i] : params.levelId || this.app.levelId;
+    const id = this.chain ? this.chain.ids[this.chain.i] : params.levelId || this.app.levelId;
     this.load(id);
   }
 
@@ -54,7 +57,7 @@ export class PlayScene extends Scene {
   resume() {
     this.app.input.reset();
     if (this.slow !== this.app.save.settings().slow) this.load(this.level.id);
-    else this.app.music.start({ ...this.world, bpm: this.level.bpm * (this.slow ? 0.75 : 1) });
+    else this.app.music.start({ ...this.world, bpm: this.level.bpm * this.timeScale });
   }
 
   toMap() {
@@ -72,19 +75,20 @@ export class PlayScene extends Scene {
     this.sim = new this.mode.Sim(this.compiled);
     this.rec = this.app.save.level(this.level.id);
     this.world = worlds[this.level.world];
-    this.slow = this.app.save.settings().slow;
-    this.timeScale = this.slow ? 0.75 : 1;
+    const st = this.app.save.settings();
+    this.slow = this.chain ? false : st.slow;
+    this.timeScale = (this.slow ? 0.75 : 1) * (this.endless ? Math.min(1.5, 1 + 0.05 * this.endless.lap) : 1);
     this.acc = 0;
     this.sessionDeaths = 0;
     this.failed = false;
     this.shard = this.compiled.shard;
     const g = this.rec.ghost;
-    this.ghostEv = !this.slow && !this.gauntlet && g && g.ev ? g.ev : null;
+    this.ghostEv = st.ghost && !this.slow && !this.chain && g && g.ev ? g.ev : null;
     this.ghostSim = this.ghostEv ? new this.mode.Sim(this.compiled) : null;
     this.session = new Session({ reset: () => this.reset(), onDeath: (pct) => this.onDeath(pct) });
     this.session.best = this.rec.bestPct;
     this.session.attempt = this.rec.attempts + 1;
-    this.app.music.start({ ...this.world, bpm: this.level.bpm * (this.slow ? 0.75 : 1) });
+    this.app.music.start({ ...this.world, bpm: this.level.bpm * this.timeScale });
     this.reset();
   }
 
@@ -107,7 +111,7 @@ export class PlayScene extends Scene {
   }
 
   saveGhost(pct) {
-    if (this.slow || this.gauntlet) return;
+    if (this.slow || this.chain) return;
     const cur = this.rec.ghost ? this.rec.ghost.pct : 0;
     if (pct > cur) this.rec.ghost = { pct, ev: this.log.slice(0, 700) };
   }
@@ -121,6 +125,9 @@ export class PlayScene extends Scene {
     if (this.gauntlet) {
       this.failed = true;
       this.showGauntletFail();
+    } else if (this.endless) {
+      this.failed = true;
+      this.showEndlessOver(pct);
     }
   }
 
@@ -134,6 +141,13 @@ export class PlayScene extends Scene {
     const s = this.app.save;
     this.rec.attempts++;
     const wasCleared = this.rec.clear;
+    if (this.chain) {
+      this.winT = 0;
+      this.app.sound.play('win');
+      s.persist();
+      this.advanceChain();
+      return;
+    }
     if (this.slow) this.rec.clearSlow = true;
     else {
       this.rec.clear = true;
@@ -149,21 +163,17 @@ export class PlayScene extends Scene {
     const ctr = this.mode.center(this.sim);
     this.particles.burst(ctr.x + 80, ctr.y - 40, 46, ['#ffd24a', '#ffffff', ...(this.mode.colorsFor ? this.mode.colorsFor(this.sim) : this.mode.colors)], { speed: 420, life: 1.1, size: 5, g: 700, kind: 1, up: 260 });
     this.app.announce('Level clear');
-    if (this.gauntlet) {
-      this.advanceGauntlet();
-      return;
-    }
     this.showResults();
   }
 
   showResults() {
     const r = this.rec;
     const next = this.nextLevelId();
-    const shardBtn = this.shard && !r.shard ? 'Retry for Shard' : 'Retry';
+    const shardBtn = this.shard && !r.shard ? 'retry for shard' : 'retry';
     const got = this.sim.shardGot && !this.slow;
-    const medals = `<span class="${r.clear ? 'm-on' : 'm-slow'}">● clear${this.slow ? ' (slow)' : ''}</span>  <span class="${r.clean ? 'm-on' : 'm-off'}">★ clean</span>  <span class="${r.shard ? 'm-on' : 'm-off'}">◆ shard${got ? ' +' : ''}</span>`;
+    const medals = `<span class="${r.clear ? 'on' : 'slow'}">● clear${this.slow ? ' (slow)' : ''}</span>  <span class="${r.clean ? 'on' : 'off'}">★ clean</span>  <span class="${r.shard ? 'on' : 'off'}">◆ shard${got ? ' +' : ''}</span>`;
     this.results = this.mount(
-      `<div class="ui"><div class="panel"><h2>CLEAR</h2><p>${this.level.name} · ${this.sessionDeaths + 1} attempt${this.sessionDeaths ? 's' : ''}</p><p>${medals}</p><div class="row"><button class="btn" data-act="next">${next ? 'Next ▶' : 'Map'}</button><button class="btn ghost" data-act="retry">${shardBtn}</button>${next ? '<button class="btn ghost" data-act="map">Map</button>' : ''}</div></div></div>`,
+      `<div class="ui"><div class="panel"><h2>clear</h2><p>${this.level.name} · ${this.sessionDeaths + 1} attempt${this.sessionDeaths ? 's' : ''}</p><p>${medals}</p><div class="row"><button class="btn" data-act="next">${next ? 'next' : 'map'}</button><button class="btn" data-act="retry">${shardBtn}</button>${next ? '<button class="btn" data-act="map">map</button>' : ''}</div></div></div>`,
       'layer'
     );
     this.results.addEventListener('click', (e) => {
@@ -178,8 +188,21 @@ export class PlayScene extends Scene {
     });
   }
 
-  advanceGauntlet() {
-    const g = this.gauntlet;
+  advanceChain() {
+    const g = this.chain;
+    if (this.endless) {
+      g.cleared++;
+      if (g.i + 1 < g.ids.length) g.i++;
+      else {
+        const fresh = newEndless(g.world);
+        if (fresh.ids[0] === this.level.id && fresh.ids.length > 1) fresh.ids.push(fresh.ids.shift());
+        g.ids = fresh.ids;
+        g.i = 0;
+        g.lap++;
+      }
+      this.later(600, () => this.load(g.ids[g.i]));
+      return;
+    }
     if (g.i + 1 < g.ids.length) {
       g.i++;
       this.later(700, () => this.load(g.ids[g.i]));
@@ -187,7 +210,7 @@ export class PlayScene extends Scene {
     }
     this.app.save.setGauntlet(g.world);
     this.results = this.mount(
-      `<div class="ui"><div class="panel"><h2>GAUNTLET CLEARED</h2><p>${worlds[g.world].name} · zero deaths</p><div class="row"><button class="btn" data-act="map">Map</button></div></div></div>`,
+      `<div class="ui"><div class="panel"><h2>gauntlet cleared</h2><p>${worlds[g.world].name} · zero deaths</p><div class="row"><button class="btn" data-act="map">map</button></div></div></div>`,
       'layer'
     );
     this.results.addEventListener('click', (e) => {
@@ -195,10 +218,34 @@ export class PlayScene extends Scene {
     });
   }
 
+  showEndlessOver(pct) {
+    const g = this.endless;
+    const score = g.cleared + pct;
+    const isBest = this.app.save.setEndlessBest(g.world, score);
+    const best = this.app.save.endlessBest(g.world);
+    this.results = this.mount(
+      `<div class="ui"><div class="panel"><h2>${worlds[g.world].name.toLowerCase()} · endless</h2><p>${g.cleared} cleared · lap ${g.lap + 1} · ${Math.floor(pct * 100)}% of ${this.level.name.toLowerCase()}</p><p>${score.toFixed(2)}${isBest ? ' · new best' : ` · best ${best.toFixed(2)}`}</p><div class="row"><button class="btn" data-act="again">again</button><button class="btn" data-act="map">map</button></div></div></div>`,
+      'layer'
+    );
+    this.results.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-act]');
+      if (!a) return;
+      if (a.dataset.act === 'again') {
+        const fresh = newEndless(g.world);
+        g.ids = fresh.ids;
+        g.i = 0;
+        g.lap = 0;
+        g.cleared = 0;
+        this.load(g.ids[0]);
+      }
+      if (a.dataset.act === 'map') this.toMap();
+    });
+  }
+
   showGauntletFail() {
     const g = this.gauntlet;
     this.results = this.mount(
-      `<div class="ui"><div class="panel"><h2>GAUNTLET FAILED</h2><p>${this.level.name} · ${Math.floor(this.session.lastPct * 100)}% · level ${g.i + 1}/${g.ids.length}</p><div class="row"><button class="btn" data-act="retry">Retry gauntlet</button><button class="btn ghost" data-act="map">Map</button></div></div></div>`,
+      `<div class="ui"><div class="panel"><h2>gauntlet failed</h2><p>${this.level.name} · ${Math.floor(this.session.lastPct * 100)}% · level ${g.i + 1}/${g.ids.length}</p><div class="row"><button class="btn" data-act="retry">retry</button><button class="btn" data-act="map">map</button></div></div></div>`,
       'layer'
     );
     this.results.addEventListener('click', (e) => {
@@ -270,13 +317,21 @@ export class PlayScene extends Scene {
   }
 
   update(dt) {
-    const { input, sound, music } = this.app;
     this.acc += this.timeScale;
     if (this.acc < 1) {
-      music.update();
+      this.app.music.update();
       return;
     }
-    this.acc -= 1;
+    let n = 0;
+    while (this.acc >= 1 && n < 3) {
+      this.acc -= 1;
+      n++;
+      this.tick(dt);
+    }
+  }
+
+  tick(dt) {
+    const { input, sound, music } = this.app;
     const dtMs = dt * 1000;
     input.update(dtMs);
     if (input.pressed) sound.unlock();
@@ -284,7 +339,7 @@ export class PlayScene extends Scene {
     const s = this.session;
     if (this.winT >= 0) {
       this.winT += dtMs;
-      if (!this.results && !this.gauntlet && input.pressed && this.winT > 500) this.showResults();
+      if (!this.results && !this.chain && input.pressed && this.winT > 500) this.showResults();
       this.particles.update(dt);
       return;
     }
@@ -367,9 +422,14 @@ export class PlayScene extends Scene {
     const y = this.prevY + (sim.y - this.prevY) * alpha;
     const gs = this.ghostSim;
     if (gs && !gs.dead && s.alive) {
+      const gc = this.mode.center(gs);
       ctx.save();
-      ctx.globalAlpha = 0.33;
-      this.mode.drawChar(ctx, gs.y, { t: this.foxT, vy: gs.vy, grounded: gs.grounded, landT: 0, gd: gs.gd, modeName: gs.modeName, flapT: 0, air: gs.air, depth: gs.depth, slope: gs.slope, hold: false });
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = '#7df9ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(gc.x, gc.y, 17, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
     if (s.alive) this.mode.drawChar(ctx, y, { t: this.foxT, vy: sim.vy, grounded: sim.grounded, landT: this.landT, gd: sim.gd, modeName: sim.modeName, flapT: this.flapT, air: sim.air, depth: sim.depth, slope: sim.slope, hold: this.app.input.down });
@@ -396,13 +456,19 @@ export class PlayScene extends Scene {
       ctx.textAlign = 'left';
       ctx.fillText('SLOW ×0.75', 16, 64);
     }
+    if (this.endless) {
+      ctx.fillStyle = '#c9ced8';
+      ctx.font = `300 14px ${fonts.mono}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`endless · lap ${this.endless.lap + 1} · ${this.endless.cleared} cleared · ×${this.timeScale.toFixed(2)}`, W / 2, 20);
+    }
     if (this.gauntlet) {
       ctx.fillStyle = '#ffd24a';
       ctx.font = `700 14px ${fonts.mono}`;
       ctx.textAlign = 'center';
       ctx.fillText(`GAUNTLET ${this.gauntlet.i + 1}/${this.gauntlet.ids.length} · zero deaths`, W / 2, 20);
     }
-    if (sim.t < 2.2 && !this.gauntlet) {
+    if (sim.t < 2.2 && !this.chain) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, 2.2 - sim.t));
       ctx.fillStyle = colors.fg;

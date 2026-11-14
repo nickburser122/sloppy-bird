@@ -28,13 +28,13 @@ describe('boot from the real index.html', () => {
     expect(errors).toEqual([]);
     const overlay = dom.window.document.getElementById('overlay');
     expect(overlay.querySelector('[data-act="play"]')).not.toBeNull();
-    expect(overlay.textContent).toContain('NERVE');
+    expect(overlay.textContent).toContain('nerve');
   });
 
   it('opens the world map from the title and lists every level', () => {
     const overlay = dom.window.document.getElementById('overlay');
     overlay.querySelector('[data-act="play"]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-    expect(overlay.querySelectorAll('.node').length).toBe(19);
+    expect(overlay.querySelectorAll('.chip').length).toBe(19);
   });
 
   it('references only files that exist in public', () => {

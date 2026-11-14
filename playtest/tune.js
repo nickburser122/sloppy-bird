@@ -100,7 +100,7 @@ function chunk(kind, b) {
     case 'S': return { len: 0, gap: 1 + rand() * 0.75, ev: [{ beat: b, type: 'spike', n: 1 }] };
     case 'S2': return { len: 0, gap: 1.25 + rand() * 0.75, ev: [{ beat: b, type: 'spike', n: 2 }] };
     case 'P': return { len: 0, gap: 2.25 + rand() * 0.75, ev: [{ beat: b, type: 'pit', w: 180 + Math.round(rand() * 3) * 20 }] };
-    case 'C': return { len: 0, gap: 1.75 + rand(), ev: [{ beat: b, type: 'ceil', w: 200, h: 346, g }, { beat: b + 0.5, type: 'spike', n: 1, g }] };
+    case 'C': return { len: 0, gap: 1.75 + rand(), ev: [{ beat: b, type: 'ceil', w: 200, h: 300, g }, { beat: b + 0.5, type: 'spike', n: 1, g }] };
     case 'B': return { len: 0, gap: 3.25 + rand() * 0.75, ev: [{ beat: b, type: 'pit', w: 380, g }, { beat: b + 0.5, type: 'crumble', w: 120, y: 55, g }] };
     case 'M': return { len: 0, gap: 3.25 + rand() * 0.75, ev: [{ beat: b, type: 'pit', w: 380, g }, { beat: b + 0.75, type: 'mover', w: 120, y: 60, amp: 40, period: 4, phase: 0, g }] };
     case 'R': return { len: 0, gap: 3.75 + rand() * 0.5, ev: [{ beat: b, type: 'pit', w: 480, g }, { beat: b + 1, type: 'ring', y: 130, g }] };
@@ -198,6 +198,7 @@ function score(res) {
   if (m.spamMax >= 0.25) s += 5 + (m.spamMax - 0.25) * 20;
   if (m.minWindow < g.window) s += (g.window - m.minWindow) / 15;
   if (m.wide > 0.3) s += (m.wide - 0.3) * 20;
+  if (m.hold < 50) s += (50 - m.hold) / 8;
   if (m.reaction < g.reaction) s += (g.reaction - m.reaction) / 60;
   if (m.ips < g.ips[0]) s += (g.ips[0] - m.ips) * 8;
   if (m.ips > g.ips[1]) s += (m.ips - g.ips[1]) * 8;
@@ -268,7 +269,7 @@ function mutate(events, res) {
         if (rand() < 0.4) e.side = 1 - e.side;
         else e.w = Math.min(240, Math.max(140, e.w + pick([-20, 20])));
       } else if (e.type === 'orb') e.y = Math.min(340, Math.max(200, e.y + pick([-30, 30])));
-      else if (e.type === 'ceil') e.h = Math.min(350, Math.max(330, e.h + pick([-10, 10])));
+      else if (e.type === 'ceil') e.h = Math.min(304, Math.max(296, e.h + pick([-4, 4])));
       else if (e.type === 'crumble' || e.type === 'mover') {
         e.w = Math.min(160, Math.max(80, e.w + pick([-20, 20])));
         e.y = Math.min(80, Math.max(40, e.y + pick([-10, 10])));

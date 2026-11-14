@@ -11,16 +11,17 @@ export class SettingsScene extends Scene {
   build() {
     if (this.el) this.el.remove();
     const s = this.app.save.settings();
-    const on = (v) => (v ? 'On' : 'Off');
+    const on = (v) => (v ? 'on' : 'off');
     this.el = this.mount(
-      `<div class="ui"><div class="panel"><h2>Settings</h2>
-<div class="setrow"><span>Sound</span><button class="btn small" data-k="muted">${s.muted ? 'Off' : 'On'}</button></div>
-<div class="setrow"><span>Volume</span><input type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" data-vol></div>
-<div class="setrow"><span>Slow mode ×0.75<small>clears here don't count toward unlocks</small></span><button class="btn small" data-k="slow">${on(s.slow)}</button></div>
-<div class="setrow"><span>Reduced motion<small>no shake, flashes or pulses</small></span><button class="btn small" data-k="reducedMotion">${on(s.reducedMotion)}</button></div>
-<div class="setrow"><span>Bold outlines<small>thicker hazard outlines</small></span><button class="btn small" data-k="outline">${on(s.outline)}</button></div>
-<div class="setrow"><span>Reset progress</span><button class="btn small ghost" data-reset>Reset</button></div>
-<div class="row"><button class="btn" data-act="back">Back</button></div></div></div>`,
+      `<div class="ui"><div class="panel"><h2>settings</h2>
+<div class="setrow"><span>sound</span><button class="btn small" data-k="muted">${s.muted ? 'off' : 'on'}</button></div>
+<div class="setrow"><span>volume</span><input type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" data-vol></div>
+<div class="setrow"><span>slow mode ×0.75<small>clears here don't count toward medals</small></span><button class="btn small" data-k="slow">${on(s.slow)}</button></div>
+<div class="setrow"><span>reduced motion<small>no shake, flashes or pulses</small></span><button class="btn small" data-k="reducedMotion">${on(s.reducedMotion)}</button></div>
+<div class="setrow"><span>bold outlines<small>thicker hazard outlines</small></span><button class="btn small" data-k="outline">${on(s.outline)}</button></div>
+<div class="setrow"><span>ghost marker<small>a ring where your best attempt is</small></span><button class="btn small" data-k="ghost">${on(s.ghost)}</button></div>
+<div class="setrow"><span>reset progress</span><button class="btn small" data-reset>reset</button></div>
+<div class="row"><button class="btn" data-act="back">back</button></div></div></div>`,
       'layer'
     );
     this.el.addEventListener('click', (e) => {
@@ -41,7 +42,7 @@ export class SettingsScene extends Scene {
           this.build();
         } else {
           reset.dataset.armed = '1';
-          reset.textContent = 'Confirm';
+          reset.textContent = 'confirm';
         }
       } else if (back) this.close();
     });

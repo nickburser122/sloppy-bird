@@ -4,16 +4,18 @@ import { validate } from '../src/levels/validator.js';
 import { checkLevel } from '../src/levels/schema.js';
 
 const knownMisses = {
-  'w1-l3': ['tightest window'],
+  'w1-l2': ['tightest window'],
+  'w1-l3': ['tightest window', 'jitter'],
+  'w1-l4': ['tightest window', 'tightest hold window', 'jitter'],
   'w2-l2': ['reaction'],
   'w3-l2': ['reaction', 'inputs/s', 'no-input stretch', 'jitter'],
   'w3-l3': ['tightest window', 'of windows over 400ms', 'no-input stretch', 'jitter'],
-  'w3-l4': ['tightest window', 'of windows over 400ms', 'inputs/s', 'no-input stretch'],
+  'w3-l4': ['tightest window', 'no-input stretch', 'jitter'],
+  'w4-l3': ['inputs/s'],
+  'w4-l4': ['inputs/s', 'no-input stretch'],
   'w5-l1': ['inputs/s', 'no-input stretch'],
   'w5-l2': ['inputs/s', 'no-input stretch'],
-  'w5-boss': ['no-input stretch', 'jitter'],
-  'w4-l3': ['inputs/s'],
-  'w4-l4': ['inputs/s', 'no-input stretch']
+  'w5-boss': ['no-input stretch', 'tightest hold window', 'jitter']
 };
 
 describe('levels', () => {

@@ -23,6 +23,7 @@ function score(res) {
   if (m.spamMax >= 0.25) s += 5 + (m.spamMax - 0.25) * 20;
   if (m.minWindow < g.window) s += (g.window - m.minWindow) / 15;
   if (m.wide > 0.3) s += (m.wide - 0.3) * 20;
+  if (m.hold < 50) s += (50 - m.hold) / 8;
   if (m.reaction < g.reaction) s += (g.reaction - m.reaction) / 60;
   if (m.ips < g.ips[0]) s += (g.ips[0] - m.ips) * 8;
   if (m.ips > g.ips[1]) s += (m.ips - g.ips[1]) * 8;

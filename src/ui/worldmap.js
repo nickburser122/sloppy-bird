@@ -1,42 +1,57 @@
 import { Scene } from '../engine/scenes.js';
 import { tuning } from '../config/tuning.js';
 import { worlds } from '../config/worlds.js';
-import { worldLevels, worldUnlocked, worldComplete, gauntletUnlocked, medalsOf, totals, WORLD_IDS } from '../engine/progress.js';
+import { worldLevels, endlessUnlocked, gauntletUnlocked, medalsOf, totals, WORLD_IDS } from '../engine/progress.js';
 
-const CAST = { 1: 'Kit · RUN', 2: 'Zzt · FLAP', 3: 'Pip · SURF', 4: 'Bolt · FLIP', 5: 'all four · MIX' };
+const CAST = { 1: 'kit · run', 2: 'zzt · flap', 3: 'pip · surf', 4: 'bolt · flip', 5: 'all four · mix' };
+
+const shuffle = (list) => {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+export function newEndless(world) {
+  return { world, ids: shuffle(worldLevels(world).map((l) => l.id)), i: 0, lap: 0, cleared: 0 };
+}
 
 export class WorldMapScene extends Scene {
   enter() {
     const save = this.app.save;
     const tt = totals(save);
-    const cards = WORLD_IDS.map((w) => {
-      const open = worldUnlocked(save, w);
+    const rows = WORLD_IDS.map((w) => {
       const list = worldLevels(w);
-      const nodes = list
+      const chips = list
         .map((l, i) => {
           const r = save.data().levels[l.id] || {};
           const m = medalsOf(r);
-          const best = Math.floor((r.bestPct || 0) * 100);
-          const label = /\d$/.test(l.id) ? `${w}-${i + 1}` : '★';
-          return `<button class="node" data-level="${l.id}" ${open ? '' : 'disabled'}><b>${label} ${l.name}</b><span class="meta"><span><span class="${m.clear ? 'm-on' : m.slow ? 'm-slow' : 'm-off'}">●</span> <span class="${m.clean ? 'm-on' : 'm-off'}">★</span> <span class="${m.shard ? 'm-on' : 'm-off'}">◆</span></span><span>${best}% · ${r.attempts || 0}</span></span></button>`;
+          const label = /\d$/.test(l.id) ? String(i + 1) : '★';
+          return `<button class="chip" data-level="${l.id}"><span class="top"><b>${label}</b><span><span class="${m.clear ? 'on' : m.slow ? 'slow' : 'off'}">●</span><span class="${m.clean ? 'on' : 'off'}">★</span><span class="${m.shard ? 'on' : 'off'}">◆</span></span></span><span class="nm">${l.name.toLowerCase()}</span></button>`;
         })
         .join('');
-      const gUnlocked = gauntletUnlocked(save, w);
-      const gDone = save.gauntlet(w);
-      const gl = gDone ? 'Gauntlet ✔' : 'Gauntlet';
-      return `<div class="world ${open ? '' : 'locked'}"><h3>${worlds[w].name}</h3><div class="who">${CAST[w]}${open ? '' : ' · locked'}</div>${nodes}<button class="btn small" data-gauntlet="${w}" ${gUnlocked ? '' : 'disabled'}>${gl}</button></div>`;
+      const eOpen = endlessUnlocked(save, w);
+      const best = save.endlessBest(w);
+      const eLabel = eOpen ? (best ? `endless ${best.toFixed(2)}` : 'endless') : 'endless —';
+      const gOpen = gauntletUnlocked(save, w);
+      const gLabel = save.gauntlet(w) ? 'gauntlet ✓' : 'gauntlet';
+      return `<section class="wl"><div class="wh"><span class="wn">${worlds[w].name.toLowerCase()}</span><span class="wm">${CAST[w]}</span></div><div class="wlv">${chips}<span class="sp"></span><button class="link small" data-endless="${w}" ${eOpen ? '' : 'disabled title="clear this world first"'}>${eLabel}</button><button class="link small" data-gauntlet="${w}" ${gOpen ? '' : 'disabled title="clear this world first"'}>${gLabel}</button></div></section>`;
     }).join('');
     const el = this.mount(
-      `<div class="ui map"><div class="maphead"><h2>Worlds</h2><span class="sub">${tt.clear}/${tt.levels} ● · ${tt.clean} ★ · ${tt.shard} ◆</span><span class="row" style="margin:0"><button class="btn small ghost" data-act="settings">Settings</button><button class="btn small ghost" data-act="title">Title</button></span></div><div class="worlds">${cards}</div></div>`,
+      `<div class="ui map"><div class="maphead"><button class="link small" data-act="title">‹ back</button><span>${tt.clear} / ${tt.levels} · ${tt.clean} ★ · ${tt.shard} ◆</span><button class="link small" data-act="settings">settings</button></div>${rows}</div>`,
       'layer'
     );
     el.addEventListener('click', (e) => {
       const lvl = e.target.closest('[data-level]');
       const g = e.target.closest('[data-gauntlet]');
+      const en = e.target.closest('[data-endless]');
       const act = e.target.closest('[data-act]');
       this.app.sound.unlock();
-      this.app.sound.play('click');
-      if (lvl && !lvl.disabled) this.app.scenes.go('play', { levelId: lvl.dataset.level });
+      if (lvl || (g && !g.disabled) || (en && !en.disabled) || act) this.app.sound.play('click');
+      if (lvl) this.app.scenes.go('play', { levelId: lvl.dataset.level });
+      else if (en && !en.disabled) this.app.scenes.go('play', { endless: newEndless(Number(en.dataset.endless)) });
       else if (g && !g.disabled) {
         const w = Number(g.dataset.gauntlet);
         this.app.scenes.go('play', { gauntlet: { world: w, ids: worldLevels(w).map((l) => l.id), i: 0 } });
@@ -53,9 +68,7 @@ export class WorldMapScene extends Scene {
   render() {
     const { ctx } = this.app;
     const { w, h } = tuning.stage;
-    ctx.fillStyle = '#0b0d18';
+    ctx.fillStyle = '#0b0c10';
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
-    for (let x = -((this.t * 20) % 80); x < w; x += 80) ctx.fillRect(x, 0, 2, h);
   }
 }
